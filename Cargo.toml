@@ -11,3 +11,5 @@ repository = "https://github.com/rubik/hydroconf"
 keywords = ["configuration", "12factorapp", "settings"]
 
 [dependencies]
+config = "0.9"
+serde = "1.0"

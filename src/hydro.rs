@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 
-use config::{Value, Config, ConfigError};
+use config::{Config, ConfigError, Value};
 use serde::Deserialize;
 
 use crate::settings::HydroSettings;
-
 
 #[derive(Debug, Clone)]
 pub struct Hydroconf {
@@ -12,13 +11,11 @@ pub struct Hydroconf {
     hydro: HydroSettings,
 }
 
-
 impl Default for Hydroconf {
     fn default() -> Self {
         Self::new(HydroSettings::default())
     }
 }
-
 
 impl Hydroconf {
     fn new(hydro: HydroSettings) -> Self {
@@ -28,14 +25,14 @@ impl Hydroconf {
         }
     }
 
-    pub fn hydrate<'de, T: Deserialize<'de>>(mut self) -> Result<T, ConfigError> {
+    pub fn hydrate<'de, T: Deserialize<'de>>(
+        mut self,
+    ) -> Result<T, ConfigError> {
         self.initialize();
         self.try_into()
     }
 
-    pub fn initialize(&mut self) {
-
-    }
+    pub fn initialize(&mut self) {}
 
     pub fn try_into<'de, T: Deserialize<'de>>(self) -> Result<T, ConfigError> {
         self.config.try_into()
@@ -45,14 +42,22 @@ impl Hydroconf {
         self.config.refresh()
     }
 
-    pub fn set_default<T>(&mut self, key: &str, value: T) -> Result<&mut Config, ConfigError>
+    pub fn set_default<T>(
+        &mut self,
+        key: &str,
+        value: T,
+    ) -> Result<&mut Config, ConfigError>
     where
         T: Into<Value>,
     {
         self.config.set_default(key, value)
     }
 
-    pub fn set<T>(&mut self, key: &str, value: T) -> Result<&mut Config, ConfigError>
+    pub fn set<T>(
+        &mut self,
+        key: &str,
+        value: T,
+    ) -> Result<&mut Config, ConfigError>
     where
         T: Into<Value>,
     {
@@ -82,7 +87,10 @@ impl Hydroconf {
         self.get(key).and_then(Value::into_bool)
     }
 
-    pub fn get_table(&self, key: &str) -> Result<HashMap<String, Value>, ConfigError> {
+    pub fn get_table(
+        &self,
+        key: &str,
+    ) -> Result<HashMap<String, Value>, ConfigError> {
         self.get(key).and_then(Value::into_table)
     }
 

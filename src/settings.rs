@@ -13,18 +13,26 @@ pub struct HydroSettings {
     pub envvar_nested_sep: String,
 }
 
-
 impl Default for HydroSettings {
     fn default() -> Self {
-        let envvar_prefix = env::get_var("HYDRO_", "ENVVAR_PREFIX").unwrap_or(String::from("HYDRO_"));
+        let envvar_prefix = env::get_var("HYDRO_", "ENVVAR_PREFIX")
+            .unwrap_or(String::from("HYDRO_"));
         let envvar_prefix = envvar_prefix.as_str();
         Self {
             root_path: env::get_var(envvar_prefix, "ROOT_PATH"),
             settings_file: env::get_var(envvar_prefix, "SETTINGS_FILE"),
             secrets_file: env::get_var(envvar_prefix, "SECRETS_FILE"),
-            env: env::get_var_default(envvar_prefix, "ENV", "development".into()),
+            env: env::get_var_default(
+                envvar_prefix,
+                "ENV",
+                "development".into(),
+            ),
             envvar_prefix: envvar_prefix.into(),
-            encoding: env::get_var_default(envvar_prefix, "ENCODING", "utf-8".into()),
+            encoding: env::get_var_default(
+                envvar_prefix,
+                "ENCODING",
+                "utf-8".into(),
+            ),
             envvar_nested_sep: "__".into(),
         }
     }
@@ -67,11 +75,10 @@ impl HydroSettings {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use std::env::{remove_var, set_var};
     use super::*;
+    use std::env::{remove_var, set_var};
 
     #[test]
     fn test_default() {
@@ -134,7 +141,8 @@ mod tests {
     #[test]
     fn test_one_builder_method() {
         assert_eq!(
-            HydroSettings::default().set_root_path(PathBuf::from("~/test/dir")),
+            HydroSettings::default()
+                .set_root_path(PathBuf::from("~/test/dir")),
             HydroSettings {
                 root_path: Some(PathBuf::from("~/test/dir")),
                 settings_file: None,
@@ -157,8 +165,7 @@ mod tests {
                 .set_env("production".into())
                 .set_envvar_nested_sep("-".into())
                 .set_root_path(PathBuf::from("~/test/dir"))
-                .set_settings_file(PathBuf::from("settings.toml"))
-            ,
+                .set_settings_file(PathBuf::from("settings.toml")),
             HydroSettings {
                 root_path: Some(PathBuf::from("~/test/dir")),
                 settings_file: Some(PathBuf::from("settings.toml")),

@@ -1,10 +1,12 @@
-use std::path::Path;
+use std::path::PathBuf;
+
+use crate::env;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct HydroSettings {
-    pub root_path: Option<&'static Path>,
-    pub settings_file: Option<&'static Path>,
-    pub secrets_file: Option<&'static Path>,
+    pub root_path: Option<PathBuf>,
+    pub settings_file: Option<PathBuf>,
+    pub secrets_file: Option<PathBuf>,
     pub env: String,
     pub envvar_prefix: String,
     pub encoding: String,
@@ -14,31 +16,32 @@ pub struct HydroSettings {
 
 impl Default for HydroSettings {
     fn default() -> Self {
-        // TODO: Get the default value from the env - 2020-08-08 08:34am
+        let envvar_prefix = env::get_var("HYDRO_", "ENVVAR_PREFIX").unwrap_or(String::from("HYDRO_"));
+        let envvar_prefix = envvar_prefix.as_str();
         Self {
-            root_path: None,
-            settings_file: None,
-            secrets_file: None,
-            env: "development".into(),
-            envvar_prefix: "HYDRO_".into(),
-            encoding: "utf-8".into(),
+            root_path: env::get_var(envvar_prefix, "ROOT_PATH"),
+            settings_file: env::get_var(envvar_prefix, "SETTINGS_FILE"),
+            secrets_file: env::get_var(envvar_prefix, "SECRETS_FILE"),
+            env: env::get_var_default(envvar_prefix, "ENV", "development".into()),
+            envvar_prefix: envvar_prefix.into(),
+            encoding: env::get_var_default(envvar_prefix, "ENCODING", "utf-8".into()),
             envvar_nested_sep: "__".into(),
         }
     }
 }
 
 impl HydroSettings {
-    pub fn set_root_path(mut self, p: &'static Path) -> Self {
+    pub fn set_root_path(mut self, p: PathBuf) -> Self {
         self.root_path = Some(p);
         self
     }
 
-    pub fn set_settings_file(mut self, p: &'static Path) -> Self {
+    pub fn set_settings_file(mut self, p: PathBuf) -> Self {
         self.settings_file = Some(p);
         self
     }
 
-    pub fn set_secrets_file(mut self, p: &'static Path) -> Self {
+    pub fn set_secrets_file(mut self, p: PathBuf) -> Self {
         self.secrets_file = Some(p);
         self
     }
@@ -67,6 +70,7 @@ impl HydroSettings {
 
 #[cfg(test)]
 mod tests {
+    use std::env::{remove_var, set_var};
     use super::*;
 
     #[test]
@@ -82,15 +86,57 @@ mod tests {
                 encoding: "utf-8".into(),
                 envvar_nested_sep: "__".into(),
             },
-        )
+        );
+    }
+
+    #[test]
+    fn test_default_with_env() {
+        set_var("HYDRO_ENCODING", "latin-1");
+        set_var("HYDRO_ROOT_PATH", "/an/absolute/path");
+        assert_eq!(
+            HydroSettings::default(),
+            HydroSettings {
+                root_path: Some("/an/absolute/path".into()),
+                settings_file: None,
+                secrets_file: None,
+                env: "development".into(),
+                envvar_prefix: "HYDRO_".into(),
+                encoding: "latin-1".into(),
+                envvar_nested_sep: "__".into(),
+            },
+        );
+        remove_var("HYDRO_ENCODING");
+        remove_var("HYDRO_ROOT_PATH");
+    }
+
+    #[test]
+    fn test_default_with_env_and_custom_prefix() {
+        set_var("HYDRO_ENVVAR_PREFIX", "HY_");
+        set_var("HY_ROOT_PATH", "/an/absolute/path");
+        set_var("HYDRO_ENCODING", "latin-1");
+        assert_eq!(
+            HydroSettings::default(),
+            HydroSettings {
+                root_path: Some("/an/absolute/path".into()),
+                settings_file: None,
+                secrets_file: None,
+                env: "development".into(),
+                envvar_prefix: "HY_".into(),
+                encoding: "utf-8".into(),
+                envvar_nested_sep: "__".into(),
+            },
+        );
+        remove_var("HYDRO_ENVVAR_PREFIX");
+        remove_var("HYDRO_ENCODING");
+        remove_var("HY_ROOT_PATH");
     }
 
     #[test]
     fn test_one_builder_method() {
         assert_eq!(
-            HydroSettings::default().set_root_path(Path::new("~/test/dir")),
+            HydroSettings::default().set_root_path(PathBuf::from("~/test/dir")),
             HydroSettings {
-                root_path: Some(Path::new("~/test/dir")),
+                root_path: Some(PathBuf::from("~/test/dir")),
                 settings_file: None,
                 secrets_file: None,
                 env: "development".into(),
@@ -98,7 +144,7 @@ mod tests {
                 encoding: "utf-8".into(),
                 envvar_nested_sep: "__".into(),
             },
-        )
+        );
     }
 
     #[test]
@@ -107,21 +153,21 @@ mod tests {
             HydroSettings::default()
                 .set_envvar_prefix("HY_".into())
                 .set_encoding("latin-1".into())
-                .set_secrets_file(Path::new(".secrets.toml"))
+                .set_secrets_file(PathBuf::from(".secrets.toml"))
                 .set_env("production".into())
                 .set_envvar_nested_sep("-".into())
-                .set_root_path(Path::new("~/test/dir"))
-                .set_settings_file(Path::new("settings.toml"))
+                .set_root_path(PathBuf::from("~/test/dir"))
+                .set_settings_file(PathBuf::from("settings.toml"))
             ,
             HydroSettings {
-                root_path: Some(Path::new("~/test/dir")),
-                settings_file: Some(Path::new("settings.toml")),
-                secrets_file: Some(Path::new(".secrets.toml")),
+                root_path: Some(PathBuf::from("~/test/dir")),
+                settings_file: Some(PathBuf::from("settings.toml")),
+                secrets_file: Some(PathBuf::from(".secrets.toml")),
                 env: "production".into(),
                 envvar_prefix: "HY_".into(),
                 encoding: "latin-1".into(),
                 envvar_nested_sep: "-".into(),
             },
-        )
+        );
     }
 }

@@ -21,6 +21,27 @@
   <br>
 </div>
 
+Hydroconf is a configuration management library for Rust, based on
+[config-rs](https://github.com/mehcode/config-rs) and heavily inspired by
+Python's [dynaconf](https://github.com/rochacbruno/dynaconf).
+
+# Features
+* Inspired by the [12-factor](https://12factor.net/config) configuration
+  principles
+* Effective separation of sensitive information (secrets)
+* Layered system for multi environments (e.g. development, staging, production,
+  etc.)
+* Read from [JSON], [TOML], [YAML], [HJSON], [INI] files
+
+[JSON]: https://github.com/serde-rs/json
+[TOML]: https://github.com/toml-lang/toml
+[YAML]: https://github.com/chyh1990/yaml-rust
+[HJSON]: https://github.com/hjson/hjson-rust
+[INI]: https://github.com/zonyitoo/rust-ini
+
+# Quickstart
+
+TODO
 
 <div>
   <small>

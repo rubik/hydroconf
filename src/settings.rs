@@ -15,22 +15,27 @@ pub struct HydroSettings {
 
 impl Default for HydroSettings {
     fn default() -> Self {
-        let envvar_prefix = env::get_var("HYDRO_", "ENVVAR_PREFIX")
-            .unwrap_or(String::from("HYDRO_"));
-        let envvar_prefix = envvar_prefix.as_str();
+        let hydro_suffix = "_FOR_HYDRO";
         Self {
-            root_path: env::get_var(envvar_prefix, "ROOT_PATH"),
-            settings_file: env::get_var(envvar_prefix, "SETTINGS_FILE"),
-            secrets_file: env::get_var(envvar_prefix, "SECRETS_FILE"),
+            root_path: env::get_var("", "ROOT_PATH", hydro_suffix),
+            settings_file: env::get_var("", "SETTINGS_FILE", hydro_suffix),
+            secrets_file: env::get_var("", "SECRETS_FILE", hydro_suffix),
             env: env::get_var_default(
-                envvar_prefix,
+                "",
                 "ENV",
+                hydro_suffix,
                 "development".into(),
             ),
-            envvar_prefix: envvar_prefix.into(),
+            envvar_prefix: env::get_var_default(
+                "",
+                "ENVVAR_PREFIX",
+                hydro_suffix,
+                "HYDRO_".into(),
+            ),
             encoding: env::get_var_default(
-                envvar_prefix,
+                "",
                 "ENCODING",
+                hydro_suffix,
                 "utf-8".into(),
             ),
             envvar_nested_sep: "__".into(),
@@ -98,8 +103,8 @@ mod tests {
 
     #[test]
     fn test_default_with_env() {
-        set_var("HYDRO_ENCODING", "latin-1");
-        set_var("HYDRO_ROOT_PATH", "/an/absolute/path");
+        set_var("ENCODING_FOR_HYDRO", "latin-1");
+        set_var("ROOT_PATH_FOR_HYDRO", "/an/absolute/path");
         assert_eq!(
             HydroSettings::default(),
             HydroSettings {
@@ -112,30 +117,8 @@ mod tests {
                 envvar_nested_sep: "__".into(),
             },
         );
-        remove_var("HYDRO_ENCODING");
-        remove_var("HYDRO_ROOT_PATH");
-    }
-
-    #[test]
-    fn test_default_with_env_and_custom_prefix() {
-        set_var("HYDRO_ENVVAR_PREFIX", "HY_");
-        set_var("HY_ROOT_PATH", "/an/absolute/path");
-        set_var("HYDRO_ENCODING", "latin-1");
-        assert_eq!(
-            HydroSettings::default(),
-            HydroSettings {
-                root_path: Some("/an/absolute/path".into()),
-                settings_file: None,
-                secrets_file: None,
-                env: "development".into(),
-                envvar_prefix: "HY_".into(),
-                encoding: "utf-8".into(),
-                envvar_nested_sep: "__".into(),
-            },
-        );
-        remove_var("HYDRO_ENVVAR_PREFIX");
-        remove_var("HYDRO_ENCODING");
-        remove_var("HY_ROOT_PATH");
+        remove_var("ENCODING_FOR_HYDRO");
+        remove_var("ROOT_PATH_FOR_HYDRO");
     }
 
     #[test]

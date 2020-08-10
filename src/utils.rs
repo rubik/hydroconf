@@ -6,17 +6,19 @@ pub fn walk_to_root(mut path: PathBuf) -> Vec<PathBuf> {
     let mut config;
     let mut candidates = Vec::new();
     if path.is_file() {
-        path = path.clone().parent().unwrap_or(Path::new("/")).into();
+        path = path.parent().unwrap_or_else(|| Path::new("/")).into();
     }
     for ancestor in path.ancestors() {
-        config = ancestor.clone().to_path_buf().join("config");
+        config = ancestor.to_path_buf().join("config");
         candidates.push(ancestor.to_path_buf());
         candidates.push(config);
     }
     candidates
 }
 
-pub fn config_locations(root_path: PathBuf) -> (Option<PathBuf>, Option<PathBuf>) {
+pub fn config_locations(
+    root_path: PathBuf,
+) -> (Option<PathBuf>, Option<PathBuf>) {
     let candidates = walk_to_root(root_path);
     let mut settings = None;
     let mut secrets = None;

@@ -39,13 +39,13 @@ impl Hydroconf {
             .root_path
             .clone()
             .or_else(|| std::env::current_exe().ok());
-        if root_path.is_some() {
-            let (settings, secrets) = config_locations(root_path.unwrap());
-            if settings.is_some() {
-                self.config.merge(File::from(settings.unwrap()))?;
+        if let Some(p) = root_path {
+            let (settings, secrets) = config_locations(p);
+            if let Some(settings_path) = settings {
+                self.config.merge(File::from(settings_path))?;
             }
-            if secrets.is_some() {
-                self.config.merge(File::from(secrets.unwrap()))?;
+            if let Some(secrets_path) = secrets {
+                self.config.merge(File::from(secrets_path))?;
             }
         }
 

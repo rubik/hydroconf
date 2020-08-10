@@ -31,6 +31,7 @@ Python's [dynaconf](https://github.com/rochacbruno/dynaconf).
 * Effective separation of sensitive information (secrets)
 * Layered system for multi environments (e.g. development, staging, production,
   etc.)
+* Sane defaults, with a 1-line configuration loading
 * Read from [JSON], [TOML], [YAML], [HJSON], [INI] files
 
 [JSON]: https://github.com/serde-rs/json
@@ -92,7 +93,7 @@ struct PostgresConfig {
 fn main() {
     let conf: Config = Hydro::default().hydrate();
 
-    println!("Configuration: {:#?}", conf);
+    println!("{:#?}", conf);
 }
 ```
 

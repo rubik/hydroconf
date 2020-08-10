@@ -126,6 +126,19 @@ Config {
 }
 ```
 
+Settings can always be overridden with environment variables:
+
+```bash
+$ HYDRO_PG__PASSWORD="an even stronger password" ./your-executable
+Config {
+    pg: PostgresConfig {
+        host: "localhost",
+        port: 5432,
+        password: "an even stronger password"
+    }
+}
+```
+
 TODO
 
 <div>

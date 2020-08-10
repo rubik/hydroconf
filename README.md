@@ -41,6 +41,90 @@ Python's [dynaconf](https://github.com/rochacbruno/dynaconf).
 
 # Quickstart
 
+Suppose you have the following file structure:
+
+```
+├── config
+│   ├── .secrets.toml
+│   └── settings.toml
+└── your-executable
+```
+
+`settings.toml`:
+
+```toml
+[default]
+pg.port = 5432
+pg.host = 'localhost'
+
+[production]
+pg.host = 'db-0'
+```
+
+`.secrets.toml`:
+
+```toml
+[default]
+pg.password = 'a password'
+
+[production]
+pg.password = 'a strong password'
+```
+
+Then, in your executable source:
+
+```rust
+use serde::Deserialize;
+use hydroconf::Hydro;
+
+#[derive(Deserialize)]
+struct Config {
+    pg: PostgresConfig,
+}
+
+#[derive(Deserialize)]
+struct PostgresConfig {
+    host: String,
+    port: u16,
+    password: String,
+}
+
+fn main() {
+    let conf: Config = Hydro::default().hydrate();
+
+    println!("Configuration: {:#?}", conf);
+}
+```
+
+If you compile and execute the program (in the same directory where the `config`
+directory is), you will see the following:
+
+```sh
+$ ./your-executable
+Config {
+    pg: PostgresConfig {
+        host: "localhost",
+        port: 5432,
+        password: "a password"
+    }
+}
+```
+
+Hydroconf will select the settings in the `[default]` table by default. If you
+set `ENV_FOR_HYDRO` to `production`, Hydroconf will overwrite them with the
+production ones:
+
+```sh
+$ ENV_FOR_HYDRO=production ./your-executable
+Config {
+    pg: PostgresConfig {
+        host: "db-0",
+        port: 5432,
+        password: "a strong password"
+    }
+}
+```
+
 TODO
 
 <div>

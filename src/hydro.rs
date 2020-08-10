@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
-use config::{Config, ConfigError, Value};
+use config::{Config, ConfigError, File, Value};
 use serde::Deserialize;
 
 use crate::settings::HydroSettings;
+use crate::utils::config_locations;
 
 #[derive(Debug, Clone)]
 pub struct Hydroconf {
@@ -28,40 +29,60 @@ impl Hydroconf {
     pub fn hydrate<'de, T: Deserialize<'de>>(
         mut self,
     ) -> Result<T, ConfigError> {
-        self.initialize();
+        self.initialize()?;
         self.try_into()
     }
 
-    pub fn initialize(&mut self) {}
+    pub fn initialize(&mut self) -> Result<&mut Self, ConfigError> {
+        let root_path = self
+            .hydro
+            .root_path
+            .clone()
+            .or_else(|| std::env::current_exe().ok());
+        if root_path.is_some() {
+            let (settings, secrets) = config_locations(root_path.unwrap());
+            if settings.is_some() {
+                self.config.merge(File::from(settings.unwrap()))?;
+            }
+            if secrets.is_some() {
+                self.config.merge(File::from(secrets.unwrap()))?;
+            }
+        }
+
+        Ok(self)
+    }
 
     pub fn try_into<'de, T: Deserialize<'de>>(self) -> Result<T, ConfigError> {
         self.config.try_into()
     }
 
-    pub fn refresh(&mut self) -> Result<&mut Config, ConfigError> {
-        self.config.refresh()
+    pub fn refresh(&mut self) -> Result<&mut Self, ConfigError> {
+        self.config.refresh()?;
+        Ok(self)
     }
 
     pub fn set_default<T>(
         &mut self,
         key: &str,
         value: T,
-    ) -> Result<&mut Config, ConfigError>
+    ) -> Result<&mut Self, ConfigError>
     where
         T: Into<Value>,
     {
-        self.config.set_default(key, value)
+        self.config.set_default(key, value)?;
+        Ok(self)
     }
 
     pub fn set<T>(
         &mut self,
         key: &str,
         value: T,
-    ) -> Result<&mut Config, ConfigError>
+    ) -> Result<&mut Self, ConfigError>
     where
         T: Into<Value>,
     {
-        self.config.set(key, value)
+        self.config.set(key, value)?;
+        Ok(self)
     }
 
     pub fn get<'de, T>(&self, key: &'de str) -> Result<T, ConfigError>

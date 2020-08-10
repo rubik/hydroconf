@@ -76,14 +76,14 @@ Then, in your executable source:
 
 ```rust
 use serde::Deserialize;
-use hydroconf::Hydro;
+use hydroconf::Hydroconf;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct Config {
     pg: PostgresConfig,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct PostgresConfig {
     host: String,
     port: u16,
@@ -91,7 +91,7 @@ struct PostgresConfig {
 }
 
 fn main() {
-    let conf: Config = Hydro::default().hydrate();
+    let conf: Config = Hydroconf::default().hydrate();
 
     println!("{:#?}", conf);
 }

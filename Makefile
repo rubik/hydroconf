@@ -4,4 +4,4 @@ test:
 
 .PHONY: f
 f:
-	rustfmt src/**/*.rs
+	rustfmt $(shell find src -name "*.rs" -type f)

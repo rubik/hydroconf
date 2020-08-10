@@ -17,28 +17,29 @@ impl Default for HydroSettings {
     fn default() -> Self {
         let hydro_suffix = "_FOR_HYDRO";
         Self {
-            root_path: env::get_var("", "ROOT_PATH", hydro_suffix),
-            settings_file: env::get_var("", "SETTINGS_FILE", hydro_suffix),
-            secrets_file: env::get_var("", "SECRETS_FILE", hydro_suffix),
+            root_path: env::get_var("ROOT_PATH", hydro_suffix),
+            settings_file: env::get_var("SETTINGS_FILE", hydro_suffix),
+            secrets_file: env::get_var("SECRETS_FILE", hydro_suffix),
             env: env::get_var_default(
-                "",
                 "ENV",
                 hydro_suffix,
                 "development".into(),
             ),
             envvar_prefix: env::get_var_default(
-                "",
                 "ENVVAR_PREFIX",
                 hydro_suffix,
                 "HYDRO_".into(),
             ),
             encoding: env::get_var_default(
-                "",
                 "ENCODING",
                 hydro_suffix,
                 "utf-8".into(),
             ),
-            envvar_nested_sep: "__".into(),
+            envvar_nested_sep: env::get_var_default(
+                "ENVVAR_NESTED_SEP",
+                hydro_suffix,
+                "__".into(),
+            ),
         }
     }
 }

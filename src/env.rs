@@ -1,30 +1,21 @@
 use std::path::PathBuf;
 
-pub fn get_var<'a, T>(
-    prefix: &'a str,
-    key: &'a str,
-    suffix: &'a str,
-) -> Option<T>
+pub fn get_var<'a, T>(key: &'a str, suffix: &'a str) -> Option<T>
 where
     T: FromVar,
 {
-    let full_key = format!("{}{}{}", prefix, key, suffix);
+    let full_key = format!("{}{}", key, suffix);
     match std::env::var(full_key) {
         Err(_) => None,
         Ok(v) => FromVar::parse(v),
     }
 }
 
-pub fn get_var_default<'a, T>(
-    prefix: &'a str,
-    key: &'a str,
-    suffix: &'a str,
-    default: T,
-) -> T
+pub fn get_var_default<'a, T>(key: &'a str, suffix: &'a str, default: T) -> T
 where
     T: FromVar,
 {
-    get_var(prefix, key, suffix).unwrap_or(default)
+    get_var(key, suffix).unwrap_or(default)
 }
 
 pub trait FromVar {

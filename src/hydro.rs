@@ -1,15 +1,18 @@
 use std::collections::HashMap;
 
-use config::{Config, ConfigError, File, Value};
+pub use config::{Config, ConfigError, Environment, File, Value};
 use serde::Deserialize;
 
 use crate::settings::HydroSettings;
 use crate::utils::config_locations;
 
+type Table = HashMap<String, Value>;
+
 #[derive(Debug, Clone)]
 pub struct Hydroconf {
     config: Config,
-    hydro: HydroSettings,
+    orig_config: Config,
+    hydro_settings: HydroSettings,
 }
 
 impl Default for Hydroconf {
@@ -19,35 +22,62 @@ impl Default for Hydroconf {
 }
 
 impl Hydroconf {
-    fn new(hydro: HydroSettings) -> Self {
+    fn new(hydro_settings: HydroSettings) -> Self {
         Self {
             config: Config::default(),
-            hydro,
+            orig_config: Config::default(),
+            hydro_settings,
         }
     }
 
     pub fn hydrate<'de, T: Deserialize<'de>>(
         mut self,
     ) -> Result<T, ConfigError> {
-        self.initialize()?;
+        self.load_config()?;
+        self.finalize()?;
+        self.override_from_env()?;
         self.try_into()
     }
 
-    pub fn initialize(&mut self) -> Result<&mut Self, ConfigError> {
+    pub fn load_config(&mut self) -> Result<&mut Self, ConfigError> {
         let root_path = self
-            .hydro
+            .hydro_settings
             .root_path
             .clone()
             .or_else(|| std::env::current_exe().ok());
         if let Some(p) = root_path {
             let (settings, secrets) = config_locations(p);
             if let Some(settings_path) = settings {
-                self.config.merge(File::from(settings_path))?;
+                self.orig_config.merge(File::from(settings_path))?;
             }
             if let Some(secrets_path) = secrets {
-                self.config.merge(File::from(secrets_path))?;
+                self.orig_config.merge(File::from(secrets_path))?;
             }
         }
+
+        Ok(self)
+    }
+
+    pub fn finalize(&mut self) -> Result<&mut Self, ConfigError> {
+        for &name in &["default", self.hydro_settings.env.as_str()] {
+            let table_value: Option<Table> = self.orig_config.get(name).ok();
+            if let Some(value) = table_value {
+                let mut new_config = Config::default();
+                new_config.cache = value.into();
+                self.config.merge(new_config)?;
+            }
+        }
+
+        Ok(self)
+    }
+
+    pub fn override_from_env(&mut self) -> Result<&mut Self, ConfigError> {
+        self.config.merge(
+            Environment::with_prefix(
+                self.hydro_settings.envvar_prefix.as_str(),
+            )
+            .separator(self.hydro_settings.envvar_nested_sep.as_str()),
+        )?;
 
         Ok(self)
     }
@@ -57,7 +87,10 @@ impl Hydroconf {
     }
 
     pub fn refresh(&mut self) -> Result<&mut Self, ConfigError> {
-        self.config.refresh()?;
+        self.orig_config.refresh()?;
+        self.config.cache = Value::new(None, Table::new());
+        self.finalize()?;
+        self.override_from_env()?;
         Ok(self)
     }
 

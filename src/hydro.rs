@@ -22,7 +22,7 @@ impl Default for Hydroconf {
 }
 
 impl Hydroconf {
-    fn new(hydro_settings: HydroSettings) -> Self {
+    pub fn new(hydro_settings: HydroSettings) -> Self {
         Self {
             config: Config::default(),
             orig_config: Config::default(),

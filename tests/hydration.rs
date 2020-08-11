@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 use serde::Deserialize;
-use hydroconf::{ConfigError, Hydroconf};
+use hydroconf::{ConfigError, Hydroconf, HydroSettings};
 
 #[derive(Debug, PartialEq, Deserialize)]
 struct Config {
@@ -123,4 +123,27 @@ fn test_default_hydration_with_env_vars_only() {
     env::remove_var("HYDRO_PG__PORT");
     env::remove_var("HYDRO_PG__HOST");
     env::remove_var("HYDRO_PG__PASSWORD");
+}
+
+#[test]
+fn test_custom_hydration() {
+    env::set_var("HYDRO_PG__PORT", "2378");
+    env::set_var("MYAPP_PG___PORT", "29378");
+    let settings = HydroSettings::default()
+        .set_root_path(get_data_path())
+        .set_env("production".into())
+        .set_envvar_prefix("MYAPP".into())
+        .set_envvar_nested_sep("___".into());
+    let conf: Result<Config, ConfigError> = Hydroconf::new(settings).hydrate();
+    assert!(conf.is_ok());
+    assert_eq!(conf.unwrap(), Config {
+            pg: PostgresConfig {
+                host: "db-0".into(),
+                port: 29378,
+                password: "a strong password".into(),
+            },
+        }
+    );
+    env::remove_var("HYDRO_PG__PORT");
+    env::remove_var("MYAPP_PG___PORT");
 }

@@ -64,3 +64,63 @@ fn test_default_hydration_with_env() {
     env::remove_var("ROOT_PATH_FOR_HYDRO");
     env::remove_var("ENV_FOR_HYDRO");
 }
+
+#[test]
+fn test_default_hydration_with_override() {
+    env::set_var("ROOT_PATH_FOR_HYDRO", get_data_path().into_os_string().into_string().unwrap());
+    env::set_var("HYDRO_PG__PORT", "1234");
+    let conf: Result<Config, ConfigError> = Hydroconf::default().hydrate();
+    assert!(conf.is_ok());
+    assert_eq!(conf.unwrap(), Config {
+            pg: PostgresConfig {
+                host: "localhost".into(),
+                port: 1234,
+                password: "a password".into(),
+            },
+        }
+    );
+    env::remove_var("ROOT_PATH_FOR_HYDRO");
+    env::remove_var("HYDRO_PG__PORT");
+}
+
+#[test]
+fn test_default_hydration_with_env_and_override() {
+    env::set_var("ROOT_PATH_FOR_HYDRO", get_data_path().into_os_string().into_string().unwrap());
+    env::set_var("ENV_FOR_HYDRO", "production");
+    env::set_var("HYDRO_PG__PORT", "1234");
+    let conf: Result<Config, ConfigError> = Hydroconf::default().hydrate();
+    assert!(conf.is_ok());
+    assert_eq!(conf.unwrap(), Config {
+            pg: PostgresConfig {
+                host: "db-0".into(),
+                port: 1234,
+                password: "a strong password".into(),
+            },
+        }
+    );
+    env::remove_var("ROOT_PATH_FOR_HYDRO");
+    env::remove_var("ENV_FOR_HYDRO");
+    env::remove_var("HYDRO_PG__PORT");
+}
+
+#[test]
+fn test_default_hydration_with_env_vars_only() {
+    env::set_var("ENV_FOR_HYDRO", "production");
+    env::set_var("HYDRO_PG__HOST", "staging-db-23");
+    env::set_var("HYDRO_PG__PORT", "29378");
+    env::set_var("HYDRO_PG__PASSWORD", "a super strong password");
+    let conf: Result<Config, ConfigError> = Hydroconf::default().hydrate();
+    assert!(conf.is_ok());
+    assert_eq!(conf.unwrap(), Config {
+            pg: PostgresConfig {
+                host: "staging-db-23".into(),
+                port: 29378,
+                password: "a super strong password".into(),
+            },
+        }
+    );
+    env::remove_var("ENV_FOR_HYDRO");
+    env::remove_var("HYDRO_PG__PORT");
+    env::remove_var("HYDRO_PG__HOST");
+    env::remove_var("HYDRO_PG__PASSWORD");
+}

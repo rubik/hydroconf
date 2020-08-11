@@ -103,8 +103,8 @@ fn main() {
 }
 ```
 
-If you compile and execute the program (in the same directory where the `config`
-directory is), you will see the following:
+If you compile and execute the program (making sure the executable is in the
+same directory where the `config` directory is), you will see the following:
 
 ```sh
 $ ./your-executable
@@ -144,6 +144,16 @@ Config {
     }
 }
 ```
+
+There are two formats for the environment variables:
+
+1. those that control how Hydroconf works have the form `*_FOR_HYDRO`;
+2. those that override values in your configuration have the form `HYDRO_*`.
+
+For example, to specify where Hydroconf should look for the configuration
+files, you can set the variable `ROOT_PATH_FOR_HYDRO`. In that case, it's no
+longer necessary to place the binary in the same directory as the
+configuration. Hydroconf will search directly from the root path you specify.
 
 TODO
 

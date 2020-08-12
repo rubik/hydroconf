@@ -77,7 +77,8 @@ pg.password = 'a password'
 pg.password = 'a strong password'
 ```
 
-Then, in your executable source:
+Then, in your executable source (make sure to add `serde = { version = "1.0",
+features = ["derive"] }` to your dependencies):
 
 ```rust
 use serde::Deserialize;
@@ -180,7 +181,7 @@ configure how Hydroconf works:
 * `ENVVAR_NESTED_SEP_FOR_HYDRO`: the separator in the environment variables
   holding your configuration that signals a nesting point. By default it's `__`
   (double underscore), so if you set `HYDRO_REDIS__HOST=localhost`, Hydroconf
-  will match it to the nested field `redis.host` in your configuration.
+  will match it with the nested field `redis.host` in your configuration.
 
 TODO
 

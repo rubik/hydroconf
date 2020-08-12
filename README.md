@@ -21,19 +21,24 @@
   <br>
 </div>
 
-Hydroconf is a configuration management library for Rust, based on
-[config-rs](https://github.com/mehcode/config-rs) and heavily inspired by
-Python's [dynaconf](https://github.com/rochacbruno/dynaconf).
+Hydroconf is a configuration management library for Rust, based on [config-rs]
+and heavily inspired by Python's [dynaconf].
 
 # Features
-* Inspired by the [12-factor](https://12factor.net/config) configuration
-  principles
+* Inspired by the [12-factor] configuration principles
 * Effective separation of sensitive information (secrets)
 * Layered system for multi environments (e.g. development, staging, production,
   etc.)
 * Sane defaults, with a 1-line configuration loading
 * Read from [JSON], [TOML], [YAML], [HJSON], [INI] files
 
+The [config-rs] library is a great building block, but it does not provide a
+default mechanism to load configuration and merge secrets, while keeping the
+different environment separated. Hydroconf fills this gap.
+
+[config-rs]: https://github.com/mehcode/config-rs
+[dynaconf]: https://github.com/rochacbruno/dynaconf
+[12-factor]: https://12factor.net/config
 [JSON]: https://github.com/serde-rs/json
 [TOML]: https://github.com/toml-lang/toml
 [YAML]: https://github.com/chyh1990/yaml-rust
@@ -145,6 +150,7 @@ Config {
 }
 ```
 
+# Environment variables
 There are two formats for the environment variables:
 
 1. those that control how Hydroconf works have the form `*_FOR_HYDRO`;
@@ -154,6 +160,27 @@ For example, to specify where Hydroconf should look for the configuration
 files, you can set the variable `ROOT_PATH_FOR_HYDRO`. In that case, it's no
 longer necessary to place the binary in the same directory as the
 configuration. Hydroconf will search directly from the root path you specify.
+
+Here is a list of all the currently supported environment variables to
+configure how Hydroconf works:
+
+* `ROOT_PATH_FOR_HYDRO`: specifies the location from which Hydroconf should
+  start searching configuration files. By default, Hydroconf will start from
+  the directory that contains your executable;
+* `SETTINGS_FILE_FOR_HYDRO`: exact location of the main settings file;
+* `SECRETS_FILE_FOR_HYDRO`: exact location of the file containing secrets;
+* `ENV_FOR_HYDRO`: the environment to load after loading the `default` one
+  (e.g. `development`, `testing`, `staging`, `production`, etc.). By default,
+  Hydroconf will load the `development` environment, unless otherwise
+  specified.
+* `ENVVAR_PREFIX_FOR_HYDRO`: the prefix of the environement variables holding
+  your configuration -- see group number 2. above. By default it's `HYDRO`
+  (note that you don't have to include the `_` separator, as that is added
+  automatically);
+* `ENVVAR_NESTED_SEP_FOR_HYDRO`: the separator in the environment variables
+  holding your configuration that signals a nesting point. By default it's `__`
+  (double underscore), so if you set `HYDRO_REDIS__HOST=localhost`, Hydroconf
+  will match it to the nested field `redis.host` in your configuration.
 
 TODO
 

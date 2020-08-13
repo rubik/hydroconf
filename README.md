@@ -207,9 +207,9 @@ the environment before you overwrite them.
 When you call `Hydroconf::hydrate()`, Hydroconf starts looking for your
 configuration files and if it finds them, it loads them. The search starts from
 `HydroSettings.root_path`; if the root path is not defined, Hydroconf will use
-`std::env::current_exe()``. From this path, Hydroconf generates all the
-possible candidates by walking up the directory tree, also searching in the
-`config` subfolder at each level. For example, if the root path is
+`std::env::current_exe()`. From this path, Hydroconf generates all the possible
+candidates by walking up the directory tree, also searching in the `config`
+subfolder at each level. For example, if the root path is
 `/home/user/www/api-server/dist`, Hydroconf will try the following paths, in
 this order:
 

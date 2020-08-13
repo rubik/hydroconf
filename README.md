@@ -4,7 +4,7 @@
 
 <div align="center">
   <h1>Hydroconf</h1>
-  <p>Configuration management for Rust. Keep your apps hydrated!</p>
+  <p>Effortless configuration management for Rust. Keep your apps hydrated!</p>
   <a target="_blank" href="https://travis-ci.org/rubik/hydroconf">
     <img src="https://img.shields.io/travis/rubik/hydroconf?style=for-the-badge" alt="Build">
   </a>
@@ -183,6 +183,64 @@ configure how Hydroconf works:
   (double underscore), so if you set `HYDRO_REDIS__HOST=localhost`, Hydroconf
   will match it with the nested field `redis.host` in your configuration.
 
+# Hydroconf initialization
+You can create a new Hydroconf struct in two ways.
+
+The first one is to use the `Hydroconf::default()` method, which will use the
+default settings. The default constructor will attempt to load the settings
+from the environment variables (those in the form `*_FOR_HYDRO`), and if it
+doesn't find them it will use the default values. The alternative is to create
+a `HydroSettings` struct manually and pass it to `Hydroconf`:
+
+```rust
+let hydro_settings = HydroSettings::default()
+    .set_envvar_prefix("MYAPP".into())
+    .set_env("staging".into());
+let hydro = Hydroconf::new(hydro_settings);
+```
+
+Note that `HydroSettings::default()` will still try to load the settings from
+the environment before you overwrite them.
+
+# The hydration process
+## 1. Configuration loading
+When you call `Hydroconf::hydrate()`, Hydroconf starts looking for your
+configuration files and if it finds them, it loads them. The search starts from
+`HydroSettings.root_path`; if the root path is not defined, Hydroconf will use
+`std::env::current_exe()``. From this path, Hydroconf generates all the
+possible candidates by walking up the directory tree, also searching in the
+`config` subfolder at each level. For example, if the root path is
+`/home/user/www/api-server/dist`, Hydroconf will try the following paths, in
+this order:
+
+1. `/home/user/www/api-server/dist/config`
+2. `/home/user/www/api-server/dist`
+3. `/home/user/www/api-server/config`
+4. `/home/user/www/api-server`
+5. `/home/user/www/config`
+6. `/home/user/www`
+7. `/home/user/config`
+8. `/home/user`
+9. `/home/config`
+10. `/home`
+11. `/config`
+12. `/`
+
+In each directory, Hydroconf will search for the files
+`settings.{toml,json,yaml,ini,hjson}` and
+`.secrets.{toml,json,yaml,ini,hjson}`. As soon as one of those (or both) are
+found, the search stops and Hydroconf won't search the remaining upper levels.
+
+## 2. Finalization
+TODO
+
+## 3. Environment variables overrides
+TODO
+
+## 4. Freezing
+TODO
+
+# Best practices
 TODO
 
 <div>

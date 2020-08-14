@@ -34,7 +34,7 @@ and heavily inspired by Python's [dynaconf].
 
 The [config-rs] library is a great building block, but it does not provide a
 default mechanism to load configuration and merge secrets, while keeping the
-different environment separated. Hydroconf fills this gap.
+different environments separated. Hydroconf fills this gap.
 
 [config-rs]: https://github.com/mehcode/config-rs
 [dynaconf]: https://github.com/rochacbruno/dynaconf

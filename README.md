@@ -231,13 +231,16 @@ In each directory, Hydroconf will search for the files
 `.secrets.{toml,json,yaml,ini,hjson}`. As soon as one of those (or both) are
 found, the search stops and Hydroconf won't search the remaining upper levels.
 
-## 2. Finalization
+## 2. Merging
 TODO
 
-## 3. Environment variables overrides
+## 3. `.env` file overrides
 TODO
 
-## 4. Freezing
+## 4. Environment variables overrides
+TODO
+
+## 5. Freezing
 TODO
 
 # Best practices

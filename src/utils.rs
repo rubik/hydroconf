@@ -41,6 +41,17 @@ pub fn config_locations(
     (None, None)
 }
 
+pub fn dotenv_location(root_path: PathBuf) -> Option<PathBuf> {
+    let candidates = walk_to_root(root_path);
+    for cand in candidates {
+        let dotenv_cand = cand.join(".env");
+        if dotenv_cand.exists() {
+            return Some(dotenv_cand);
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

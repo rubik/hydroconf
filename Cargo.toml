@@ -12,6 +12,7 @@ keywords = ["configuration", "12factorapp", "settings"]
 
 [dependencies]
 config = "0.10.1"
+dotenv-parser = ">=0.1.2"
 serde = "1.0"
 
 [dev-dependencies]

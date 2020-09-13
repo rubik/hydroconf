@@ -1,10 +1,12 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 pub use config::{Config, ConfigError, Environment, File, Value};
+use dotenv_parser::parse_dotenv;
 use serde::Deserialize;
 
 use crate::settings::HydroSettings;
-use crate::utils::config_locations;
+use crate::utils::{config_locations, dotenv_location};
 
 type Table = HashMap<String, Value>;
 
@@ -34,18 +36,14 @@ impl Hydroconf {
         mut self,
     ) -> Result<T, ConfigError> {
         self.load_config()?;
-        self.finalize()?;
+        self.merge()?;
+        self.override_from_dotenv()?;
         self.override_from_env()?;
         self.try_into()
     }
 
     pub fn load_config(&mut self) -> Result<&mut Self, ConfigError> {
-        let root_path = self
-            .hydro_settings
-            .root_path
-            .clone()
-            .or_else(|| std::env::current_exe().ok());
-        if let Some(p) = root_path {
+        if let Some(p) = self.root_path() {
             let (settings, secrets) = config_locations(p);
             if let Some(settings_path) = settings {
                 self.orig_config.merge(File::from(settings_path))?;
@@ -58,13 +56,39 @@ impl Hydroconf {
         Ok(self)
     }
 
-    pub fn finalize(&mut self) -> Result<&mut Self, ConfigError> {
+    pub fn merge(&mut self) -> Result<&mut Self, ConfigError> {
         for &name in &["default", self.hydro_settings.env.as_str()] {
             let table_value: Option<Table> = self.orig_config.get(name).ok();
             if let Some(value) = table_value {
                 let mut new_config = Config::default();
                 new_config.cache = value.into();
                 self.config.merge(new_config)?;
+            }
+        }
+
+        Ok(self)
+    }
+
+    pub fn override_from_dotenv(&mut self) -> Result<&mut Self, ConfigError> {
+        if let Some(p) = self.root_path() {
+            if let Some(dotenv_path) = dotenv_location(p) {
+                let uri =
+                    dotenv_path.clone().into_os_string().into_string().ok();
+                let source = std::fs::read_to_string(dotenv_path.clone())
+                    .map_err(|e| ConfigError::FileParse {
+                        uri: uri.clone(),
+                        cause: e.into(),
+                    })?;
+                let map = parse_dotenv(&source).map_err(|e| {
+                    ConfigError::FileParse {
+                        uri,
+                        cause: e.into(),
+                    }
+                })?;
+
+                for (key, val) in map.iter() {
+                    self.config.set::<String>(key, val.into())?;
+                }
             }
         }
 
@@ -82,6 +106,13 @@ impl Hydroconf {
         Ok(self)
     }
 
+    pub fn root_path(&self) -> Option<PathBuf> {
+        self.hydro_settings
+            .root_path
+            .clone()
+            .or_else(|| std::env::current_exe().ok())
+    }
+
     pub fn try_into<'de, T: Deserialize<'de>>(self) -> Result<T, ConfigError> {
         self.config.try_into()
     }
@@ -89,7 +120,7 @@ impl Hydroconf {
     pub fn refresh(&mut self) -> Result<&mut Self, ConfigError> {
         self.orig_config.refresh()?;
         self.config.cache = Value::new(None, Table::new());
-        self.finalize()?;
+        self.merge()?;
         self.override_from_env()?;
         Ok(self)
     }

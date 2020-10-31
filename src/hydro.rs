@@ -6,7 +6,7 @@ use dotenv_parser::parse_dotenv;
 use serde::Deserialize;
 
 use crate::settings::HydroSettings;
-use crate::utils::{config_locations, dotenv_location};
+use crate::sources::FileSources;
 
 type Table = HashMap<String, Value>;
 
@@ -35,20 +35,29 @@ impl Hydroconf {
     pub fn hydrate<'de, T: Deserialize<'de>>(
         mut self,
     ) -> Result<T, ConfigError> {
-        self.load_config()?;
-        self.merge()?;
-        self.override_from_dotenv()?;
-        self.override_from_env()?;
-        self.try_into()
+        let sources = self.discover_sources();
+        if let Some(sources) = sources {
+            self.load(sources)?;
+        }
+        self.merge()?
+            .override_from_env()?
+            .try_into()
     }
 
-    pub fn load_config(&mut self) -> Result<&mut Self, ConfigError> {
+    pub fn discover_sources(&self) -> Option<FileSources> {
+        self.root_path().map(|p| {
+            FileSources::from_root(p, self.hydro_settings.env.as_str())
+        })
+    }
+
+    pub fn load(&mut self, sources: FileSources) -> Result<&mut Self, ConfigError> {
         if let Some(p) = self.root_path() {
-            let (settings, secrets) = config_locations(p);
-            if let Some(settings_path) = settings {
+            let sources =
+                FileSources::from_root(p, self.hydro_settings.env.as_str());
+            if let Some(settings_path) = sources.settings {
                 self.orig_config.merge(File::from(settings_path))?;
             }
-            if let Some(secrets_path) = secrets {
+            if let Some(secrets_path) = sources.secrets {
                 self.orig_config.merge(File::from(secrets_path))?;
             }
         }
@@ -69,31 +78,31 @@ impl Hydroconf {
         Ok(self)
     }
 
-    pub fn override_from_dotenv(&mut self) -> Result<&mut Self, ConfigError> {
-        if let Some(p) = self.root_path() {
-            if let Some(dotenv_path) = dotenv_location(p) {
-                let uri =
-                    dotenv_path.clone().into_os_string().into_string().ok();
-                let source = std::fs::read_to_string(dotenv_path.clone())
-                    .map_err(|e| ConfigError::FileParse {
-                        uri: uri.clone(),
-                        cause: e.into(),
-                    })?;
-                let map = parse_dotenv(&source).map_err(|e| {
-                    ConfigError::FileParse {
-                        uri,
-                        cause: e.into(),
-                    }
-                })?;
+    //pub fn override_from_dotenv(&mut self) -> Result<&mut Self, ConfigError> {
+    //if let Some(p) = self.root_path() {
+    //if let Some(dotenv_path) = dotenv_location(p) {
+    //let uri =
+    //dotenv_path.clone().into_os_string().into_string().ok();
+    //let source = std::fs::read_to_string(dotenv_path.clone())
+    //.map_err(|e| ConfigError::FileParse {
+    //uri: uri.clone(),
+    //cause: e.into(),
+    //})?;
+    //let map = parse_dotenv(&source).map_err(|e| {
+    //ConfigError::FileParse {
+    //uri,
+    //cause: e.into(),
+    //}
+    //})?;
 
-                for (key, val) in map.iter() {
-                    self.config.set::<String>(key, val.into())?;
-                }
-            }
-        }
+    //for (key, val) in map.iter() {
+    //self.config.set::<String>(key, val.into())?;
+    //}
+    //}
+    //}
 
-        Ok(self)
-    }
+    //Ok(self)
+    //}
 
     pub fn override_from_env(&mut self) -> Result<&mut Self, ConfigError> {
         self.config.merge(
@@ -117,13 +126,13 @@ impl Hydroconf {
         self.config.try_into()
     }
 
-    pub fn refresh(&mut self) -> Result<&mut Self, ConfigError> {
-        self.orig_config.refresh()?;
-        self.config.cache = Value::new(None, Table::new());
-        self.merge()?;
-        self.override_from_env()?;
-        Ok(self)
-    }
+    //pub fn refresh(&mut self) -> Result<&mut Self, ConfigError> {
+        //self.orig_config.refresh()?;
+        //self.config.cache = Value::new(None, Table::new());
+        //self.merge()?;
+        //self.override_from_env()?;
+        //Ok(self)
+    //}
 
     pub fn set_default<T>(
         &mut self,

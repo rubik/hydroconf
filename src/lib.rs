@@ -225,7 +225,8 @@
 mod env;
 mod hydro;
 mod settings;
-mod utils;
+mod sources;
 
 pub use hydro::{Config, ConfigError, Environment, File, Hydroconf};
 pub use settings::HydroSettings;
+pub use sources::FileSources;

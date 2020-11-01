@@ -4,7 +4,7 @@ const SETTINGS_FILE_EXTENSIONS: &[&str] =
     &["toml", "json", "yaml", "ini", "hjson"];
 const SETTINGS_DIRS: &[&str] = &["", "config"];
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct FileSources {
     pub settings: Option<PathBuf>,
     pub secrets: Option<PathBuf>,

@@ -145,6 +145,17 @@ fn test_custom_hydration() {
 #[test]
 fn test_multiple_dotenvs() {
     env::set_var("ROOT_PATH_FOR_HYDRO", get_data_path("2").into_os_string().into_string().unwrap());
+    env::set_var("ENV_FOR_HYDRO", "development");
+
+    let conf: Result<Config, ConfigError> = Hydroconf::default().hydrate();
+    assert_eq!(conf.unwrap(), Config {
+        pg: PostgresConfig {
+            host: "localhost".into(),
+            port: 15330,
+            password: "a password".into(),
+        },
+    });
+
     env::set_var("ENV_FOR_HYDRO", "production");
     let conf: Result<Config, ConfigError> = Hydroconf::default().hydrate();
     assert_eq!(conf.unwrap(), Config {
@@ -155,17 +166,18 @@ fn test_multiple_dotenvs() {
         },
     });
 
+    env::set_var("ROOT_PATH_FOR_HYDRO", get_data_path("3").into_os_string().into_string().unwrap());
     env::set_var("ENV_FOR_HYDRO", "development");
+
     let conf: Result<Config, ConfigError> = Hydroconf::default().hydrate();
     assert_eq!(conf.unwrap(), Config {
         pg: PostgresConfig {
-            host: "db-0".into(),
-            port: 15330,
-            password: "a strong password".into(),
+            host: "localhost".into(),
+            port: 12329,
+            password: "a password".into(),
         },
     });
 
-    env::set_var("ROOT_PATH_FOR_HYDRO", get_data_path("3").into_os_string().into_string().unwrap());
     env::set_var("ENV_FOR_HYDRO", "production");
     let conf: Result<Config, ConfigError> = Hydroconf::default().hydrate();
     assert_eq!(conf.unwrap(), Config {
@@ -176,12 +188,25 @@ fn test_multiple_dotenvs() {
         },
     });
 
+    env::set_var("ROOT_PATH_FOR_HYDRO", get_data_path("3").into_os_string().into_string().unwrap());
     env::set_var("ENV_FOR_HYDRO", "development");
+    env::set_var("ENVVAR_PREFIX_FOR_HYDRO", "APP_");
+
+    let conf: Result<Config, ConfigError> = Hydroconf::default().hydrate();
+    assert_eq!(conf.unwrap(), Config {
+        pg: PostgresConfig {
+            host: "localhost".into(),
+            port: 5432,
+            password: "a password".into(),
+        },
+    });
+
+    env::set_var("ENV_FOR_HYDRO", "production");
     let conf: Result<Config, ConfigError> = Hydroconf::default().hydrate();
     assert_eq!(conf.unwrap(), Config {
         pg: PostgresConfig {
             host: "db-0".into(),
-            port: 12329,
+            port: 5432,
             password: "a strong password".into(),
         },
     });

@@ -47,9 +47,12 @@ impl Hydroconf {
     }
 
     pub fn discover_sources(&mut self) {
-        self.sources = self.root_path().map(|p| {
-            FileSources::from_root(p, self.hydro_settings.env.as_str())
-        }).unwrap_or_else(|| FileSources::default());
+        self.sources = self
+            .root_path()
+            .map(|p| {
+                FileSources::from_root(p, self.hydro_settings.env.as_str())
+            })
+            .unwrap_or_else(|| FileSources::default());
     }
 
     pub fn load_settings(&mut self) -> Result<&mut Self, ConfigError> {
@@ -89,9 +92,21 @@ impl Hydroconf {
                     cause: e.into(),
                 })?;
 
-            // FIXME: split and transform to lowercase
             for (key, val) in map.iter() {
-                self.config.set::<String>(key, val.into())?;
+                if val.is_empty() {
+                    continue;
+                }
+                let prefix =
+                    self.hydro_settings.envvar_prefix.to_lowercase() + "_";
+                let mut key = key.to_lowercase();
+                if !key.starts_with(&prefix) {
+                    continue;
+                } else {
+                    key = key[prefix.len()..].to_string();
+                }
+                let sep = self.hydro_settings.envvar_nested_sep.clone();
+                key = key.replace(&sep, ".");
+                self.config.set::<String>(&key, val.into())?;
             }
         }
 

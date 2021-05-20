@@ -1,0 +1,6 @@
+[default]
+pg.port = 5432
+pg.host = 'localhost'
+
+[production]
+pg.host = 'db-0'

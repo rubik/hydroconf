@@ -33,7 +33,7 @@
 //! Then, in your executable source (make sure to add `serde = { version = "1.0",
 //! features = ["derive"] }` to your dependencies):
 //!
-//! ```rust
+//! ```no_run
 //! use serde::Deserialize;
 //! use hydroconf::Hydroconf;
 //!
@@ -145,6 +145,8 @@
 //! a `HydroSettings` struct manually and pass it to `Hydroconf`:
 //!
 //! ```rust
+//! # use hydroconf::{Hydroconf, HydroSettings};
+//!
 //! let hydro_settings = HydroSettings::default()
 //!     .set_envvar_prefix("MYAPP".into())
 //!     .set_env("staging".into());
@@ -225,7 +227,9 @@
 mod env;
 mod hydro;
 mod settings;
+mod sources;
 mod utils;
 
 pub use hydro::{Config, ConfigError, Environment, File, Hydroconf};
 pub use settings::HydroSettings;
+pub use sources::FileSources;

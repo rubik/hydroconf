@@ -217,7 +217,7 @@
 //!    "production", etc.);
 //! 2. keep the secret values inside `config/.secrets.{toml,yaml,json,...}`
 //!    separated by environment and exclude this file from version control;
-//! 3. define the environment variable `ENV_FOR_DYNACONF` to specify which
+//! 3. define the environment variable `ENV_FOR_HYDRO` to specify which
 //!    environment should be loaded (besides the "default" one, which is always
 //!    loaded first);
 //! 4. if you want to override some values, or specify some secret values which
@@ -228,6 +228,8 @@ mod env;
 mod hydro;
 mod settings;
 mod sources;
+#[cfg(not(feature = "tracing"))]
+mod tracing;
 mod utils;
 
 pub use hydro::{Config, ConfigError, Environment, File, Hydroconf};

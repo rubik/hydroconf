@@ -1,19 +1,29 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-pub use config::{Config, ConfigError, Environment, File, Value};
+pub use config::{
+    builder::DefaultState, Config, ConfigBuilder, ConfigError, Environment,
+    File, Value,
+};
 use dotenv_parser::parse_dotenv;
 use serde::Deserialize;
+#[cfg(feature = "tracing")]
+use tracing;
 
 use crate::settings::HydroSettings;
 use crate::sources::FileSources;
+#[cfg(not(feature = "tracing"))]
+use crate::tracing;
 use crate::utils::path_to_string;
 
 type Table = HashMap<String, Value>;
+const PREFIX_SEPARATOR: &str = "_";
 
 #[derive(Debug, Clone)]
 pub struct Hydroconf {
     config: Config,
+    // This builder is for per-environment config (the "config" field above)
+    builder: ConfigBuilder<DefaultState>,
     orig_config: Config,
     hydro_settings: HydroSettings,
     sources: FileSources,
@@ -29,6 +39,7 @@ impl Hydroconf {
     pub fn new(hydro_settings: HydroSettings) -> Self {
         Self {
             config: Config::default(),
+            builder: Config::builder(),
             orig_config: Config::default(),
             hydro_settings,
             sources: FileSources::default(),
@@ -56,30 +67,36 @@ impl Hydroconf {
     }
 
     pub fn load_settings(&mut self) -> Result<&mut Self, ConfigError> {
+        let mut builder = Config::builder();
         if let Some(ref settings_path) = self.sources.settings {
-            self.orig_config.merge(File::from(settings_path.clone()))?;
+            builder = builder.add_source(File::from(settings_path.clone()));
         }
         if let Some(ref secrets_path) = self.sources.secrets {
-            self.orig_config.merge(File::from(secrets_path.clone()))?;
+            builder = builder.add_source(File::from(secrets_path.clone()));
         }
+        self.orig_config = builder.build()?;
 
         Ok(self)
     }
 
     pub fn merge_settings(&mut self) -> Result<&mut Self, ConfigError> {
+        let mut builder = self.builder.clone();
         for &name in &["default", self.hydro_settings.env.as_str()] {
             let table_value: Option<Table> = self.orig_config.get(name).ok();
             if let Some(value) = table_value {
                 let mut new_config = Config::default();
                 new_config.cache = value.into();
-                self.config.merge(new_config)?;
+                builder = builder.add_source(new_config);
             }
         }
+        self.config = builder.build_cloned()?;
+        self.builder = builder;
 
         Ok(self)
     }
 
     pub fn override_from_dotenv(&mut self) -> Result<&mut Self, ConfigError> {
+        let mut builder = self.builder.clone();
         for dotenv_path in &self.sources.dotenv {
             let source = std::fs::read_to_string(dotenv_path.clone())
                 .map_err(|e| ConfigError::FileParse {
@@ -96,8 +113,8 @@ impl Hydroconf {
                 if val.is_empty() {
                     continue;
                 }
-                let prefix =
-                    self.hydro_settings.envvar_prefix.to_lowercase() + "_";
+                let prefix = self.hydro_settings.envvar_prefix.to_lowercase()
+                    + PREFIX_SEPARATOR;
                 let mut key = key.to_lowercase();
                 if !key.starts_with(&prefix) {
                     continue;
@@ -106,20 +123,26 @@ impl Hydroconf {
                 }
                 let sep = self.hydro_settings.envvar_nested_sep.clone();
                 key = key.replace(&sep, ".");
-                self.config.set::<String>(&key, val.into())?;
+                builder =
+                    builder.set_override::<String, String>(key, val.into())?;
             }
         }
+        self.config = builder.build_cloned()?;
+        self.builder = builder;
 
         Ok(self)
     }
 
     pub fn override_from_env(&mut self) -> Result<&mut Self, ConfigError> {
-        self.config.merge(
-            Environment::with_prefix(
-                self.hydro_settings.envvar_prefix.as_str(),
-            )
-            .separator(self.hydro_settings.envvar_nested_sep.as_str()),
-        )?;
+        let env_source = Environment::with_prefix(
+            self.hydro_settings.envvar_prefix.as_str(),
+        )
+        .prefix_separator(PREFIX_SEPARATOR)
+        .separator(self.hydro_settings.envvar_nested_sep.as_str());
+        tracing::debug!("Environment source: {:?}", env_source);
+        let builder = self.builder.clone().add_source(env_source);
+        self.config = builder.build_cloned()?;
+        self.builder = builder;
 
         Ok(self)
     }
@@ -132,7 +155,7 @@ impl Hydroconf {
     }
 
     pub fn try_into<'de, T: Deserialize<'de>>(self) -> Result<T, ConfigError> {
-        self.config.try_into()
+        self.config.try_deserialize()
     }
 
     //pub fn refresh(&mut self) -> Result<&mut Self, ConfigError> {
@@ -151,7 +174,9 @@ impl Hydroconf {
     where
         T: Into<Value>,
     {
-        self.config.set_default(key, value)?;
+        let builder = self.builder.clone().set_default(key, value)?;
+        self.config = builder.build_cloned()?;
+        self.builder = builder;
         Ok(self)
     }
 
@@ -163,7 +188,9 @@ impl Hydroconf {
     where
         T: Into<Value>,
     {
-        self.config.set(key, value)?;
+        let builder = self.builder.clone().set_override(key, value)?;
+        self.config = builder.build_cloned()?;
+        self.builder = builder;
         Ok(self)
     }
 
@@ -175,7 +202,7 @@ impl Hydroconf {
     }
 
     pub fn get_str(&self, key: &str) -> Result<String, ConfigError> {
-        self.get(key).and_then(Value::into_str)
+        self.get(key).and_then(Value::into_string)
     }
 
     pub fn get_int(&self, key: &str) -> Result<i64, ConfigError> {

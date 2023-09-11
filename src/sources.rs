@@ -1,5 +1,10 @@
 use std::path::{Path, PathBuf};
 
+#[cfg(not(feature = "tracing"))]
+use crate::tracing;
+#[cfg(feature = "tracing")]
+use tracing;
+
 const SETTINGS_FILE_EXTENSIONS: &[&str] =
     &["toml", "json", "yaml", "ini", "hjson"];
 const SETTINGS_DIRS: &[&str] = &["", "config"];
@@ -24,10 +29,12 @@ impl FileSources {
         for cand in candidates {
             let dotenv_cand = cand.join(".env");
             if dotenv_cand.exists() {
+                tracing::debug!("Collect from {:?}", dotenv_cand);
                 sources.dotenv.push(dotenv_cand);
             }
             let dotenv_cand = cand.join(format!(".env.{}", env));
             if dotenv_cand.exists() {
+                tracing::debug!("Collect from {:?}", dotenv_cand);
                 sources.dotenv.push(dotenv_cand);
             }
             'outer: for &settings_dir in SETTINGS_DIRS {
@@ -35,11 +42,13 @@ impl FileSources {
                 for &ext in SETTINGS_FILE_EXTENSIONS {
                     let settings_cand = dir.join(format!("settings.{}", ext));
                     if settings_cand.exists() {
+                        tracing::debug!("Collect from {:?}", settings_cand);
                         sources.settings = Some(settings_cand);
                         settings_found = true;
                     }
                     let secrets_cand = dir.join(format!(".secrets.{}", ext));
                     if secrets_cand.exists() {
+                        tracing::debug!("Collect from {:?}", secrets_cand);
                         sources.secrets = Some(secrets_cand);
                         settings_found = true;
                     }

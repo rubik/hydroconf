@@ -211,3 +211,29 @@ fn test_multiple_dotenvs() {
         },
     });
 }
+
+#[test]
+/// Test that local settings override settings
+fn test_local_settings() {
+    env::set_var("ROOT_PATH_FOR_HYDRO", get_data_path("4").into_os_string().into_string().unwrap());
+    env::set_var("ENV_FOR_HYDRO", "development");
+
+    let conf: Result<Config, ConfigError> = Hydroconf::default().hydrate();
+    assert_eq!(conf.unwrap(), Config {
+        pg: PostgresConfig {
+            host: "localhost".into(),
+            port: 5432,
+            password: "a password".into(),
+        },
+    });
+
+    env::set_var("ENV_FOR_HYDRO", "production");
+    let conf: Result<Config, ConfigError> = Hydroconf::default().hydrate();
+    assert_eq!(conf.unwrap(), Config {
+        pg: PostgresConfig {
+            host: "db-0".into(),
+            port: 5555,
+            password: "a strong password".into(),
+        },
+    });
+}

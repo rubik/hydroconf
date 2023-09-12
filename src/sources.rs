@@ -12,6 +12,8 @@ const SETTINGS_DIRS: &[&str] = &["", "config"];
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FileSources {
     pub settings: Option<PathBuf>,
+    // Local settings file is generally not tracked by version control.
+    pub local_settings: Option<PathBuf>,
     pub secrets: Option<PathBuf>,
     pub dotenv: Vec<PathBuf>,
 }
@@ -20,6 +22,7 @@ impl FileSources {
     pub fn from_root(root_path: PathBuf, env: &str) -> Self {
         let mut sources = Self {
             settings: None,
+            local_settings: None,
             secrets: None,
             dotenv: Vec::new(),
         };
@@ -44,6 +47,16 @@ impl FileSources {
                     if settings_cand.exists() {
                         tracing::debug!("Collect from {:?}", settings_cand);
                         sources.settings = Some(settings_cand);
+                        settings_found = true;
+                    }
+                    let local_settings_cand =
+                        dir.join(format!("settings.local.{}", ext));
+                    if local_settings_cand.exists() {
+                        tracing::debug!(
+                            "Collect from {:?}",
+                            local_settings_cand
+                        );
+                        sources.local_settings = Some(local_settings_cand);
                         settings_found = true;
                     }
                     let secrets_cand = dir.join(format!(".secrets.{}", ext));
@@ -131,6 +144,7 @@ mod test {
             FileSources::from_root(data_path.clone(), "development"),
             FileSources {
                 settings: Some(data_path.clone().join("config/settings.toml")),
+                local_settings: None,
                 secrets: Some(data_path.join("config/.secrets.toml")),
                 dotenv: vec![data_path.join(".env")],
             },
@@ -141,6 +155,7 @@ mod test {
             FileSources::from_root(data_path.clone(), "development"),
             FileSources {
                 settings: Some(data_path.clone().join("config/settings.toml")),
+                local_settings: None,
                 secrets: Some(data_path.join("config/.secrets.toml")),
                 dotenv: vec![
                     data_path.join(".env"),
@@ -154,6 +169,7 @@ mod test {
             FileSources::from_root(data_path.clone(), "production"),
             FileSources {
                 settings: Some(data_path.clone().join("config/settings.toml")),
+                local_settings: None,
                 secrets: Some(data_path.join("config/.secrets.toml")),
                 dotenv: vec![data_path.join(".env")],
             },
@@ -164,6 +180,7 @@ mod test {
             FileSources::from_root(data_path.clone(), "development"),
             FileSources {
                 settings: Some(data_path.clone().join("settings.toml")),
+                local_settings: None,
                 secrets: Some(data_path.join(".secrets.toml")),
                 dotenv: vec![data_path.join(".env")],
             },
@@ -174,11 +191,23 @@ mod test {
             FileSources::from_root(data_path.clone(), "production"),
             FileSources {
                 settings: Some(data_path.clone().join("settings.toml")),
+                local_settings: None,
                 secrets: Some(data_path.join(".secrets.toml")),
                 dotenv: vec![
                     data_path.join(".env"),
                     data_path.join(".env.production")
                 ],
+            },
+        );
+
+        let data_path = get_data_path("4");
+        assert_eq!(
+            FileSources::from_root(data_path.clone(), "development"),
+            FileSources {
+                settings: Some(data_path.clone().join("settings.toml")),
+                local_settings: Some(data_path.join("settings.local.toml")),
+                secrets: Some(data_path.join(".secrets.toml")),
+                dotenv: vec![],
             },
         );
     }

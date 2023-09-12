@@ -71,6 +71,10 @@ impl Hydroconf {
         if let Some(ref settings_path) = self.sources.settings {
             builder = builder.add_source(File::from(settings_path.clone()));
         }
+        if let Some(ref local_settings_path) = self.sources.local_settings {
+            builder =
+                builder.add_source(File::from(local_settings_path.clone()));
+        }
         if let Some(ref secrets_path) = self.sources.secrets {
             builder = builder.add_source(File::from(secrets_path.clone()));
         }

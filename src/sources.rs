@@ -5,8 +5,17 @@ use crate::tracing;
 #[cfg(feature = "tracing")]
 use tracing;
 
-const SETTINGS_FILE_EXTENSIONS: &[&str] =
-    &["toml", "json", "yaml", "ini", "hjson"];
+const SETTINGS_FILE_EXTENSIONS: &[&str] = &[
+    "toml",
+    #[cfg(feature = "json")]
+    "json",
+    #[cfg(feature = "yaml")]
+    "yaml",
+    #[cfg(feature = "ini")]
+    "ini",
+    #[cfg(feature = "json5")]
+    "hjson",
+];
 const SETTINGS_DIRS: &[&str] = &["", "config"];
 
 #[derive(Clone, Debug, Default, PartialEq)]

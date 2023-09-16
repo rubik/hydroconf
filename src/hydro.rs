@@ -18,6 +18,8 @@ use crate::utils::path_to_string;
 
 type Table = HashMap<String, Value>;
 const PREFIX_SEPARATOR: &str = "_";
+pub const AUTO_SETTING_FILENAME: &str = "settings.toml";
+pub const AUTO_SECRET_FILENAME: &str = ".secrets.toml";
 
 #[derive(Debug, Clone)]
 pub struct Hydroconf {
@@ -54,14 +56,23 @@ impl Hydroconf {
         self.merge_settings()?;
         self.override_from_dotenv()?;
         self.override_from_env()?;
-        self.try_into()
+        self.try_deserialize()
     }
 
     pub fn discover_sources(&mut self) {
         self.sources = self
             .root_path()
             .map(|p| {
-                FileSources::from_root(p, self.hydro_settings.env.as_str())
+                let settings_filename =
+                    self.hydro_settings.settings_file.clone().or(Some(AUTO_SETTING_FILENAME.into()));
+                let secrets_filename =
+                    self.hydro_settings.secrets_file.clone().or(Some(AUTO_SECRET_FILENAME.into()));
+                FileSources::from_root(
+                    p,
+                    self.hydro_settings.env.as_str(),
+                    settings_filename.as_deref(),
+                    secrets_filename.as_deref(),
+                )
             })
             .unwrap_or_else(|| FileSources::default());
     }
@@ -158,7 +169,7 @@ impl Hydroconf {
             .or_else(|| std::env::current_exe().ok())
     }
 
-    pub fn try_into<'de, T: Deserialize<'de>>(self) -> Result<T, ConfigError> {
+    pub fn try_deserialize<'de, T: Deserialize<'de>>(self) -> Result<T, ConfigError> {
         self.config.try_deserialize()
     }
 

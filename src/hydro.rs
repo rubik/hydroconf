@@ -18,8 +18,6 @@ use crate::utils::path_to_string;
 
 type Table = HashMap<String, Value>;
 const PREFIX_SEPARATOR: &str = "_";
-pub const AUTO_SETTING_FILENAME: &str = "settings.toml";
-pub const AUTO_SECRET_FILENAME: &str = ".secrets.toml";
 
 #[derive(Debug, Clone)]
 pub struct Hydroconf {
@@ -64,9 +62,9 @@ impl Hydroconf {
             .root_path()
             .map(|p| {
                 let settings_filename =
-                    self.hydro_settings.settings_file.clone().or(Some(AUTO_SETTING_FILENAME.into()));
+                    self.hydro_settings.settings_file.clone();
                 let secrets_filename =
-                    self.hydro_settings.secrets_file.clone().or(Some(AUTO_SECRET_FILENAME.into()));
+                    self.hydro_settings.secrets_file.clone();
                 FileSources::from_root(
                     p,
                     self.hydro_settings.env.as_str(),
@@ -169,7 +167,9 @@ impl Hydroconf {
             .or_else(|| std::env::current_exe().ok())
     }
 
-    pub fn try_deserialize<'de, T: Deserialize<'de>>(self) -> Result<T, ConfigError> {
+    pub fn try_deserialize<'de, T: Deserialize<'de>>(
+        self,
+    ) -> Result<T, ConfigError> {
         self.config.try_deserialize()
     }
 

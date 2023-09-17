@@ -2,6 +2,9 @@ use std::path::PathBuf;
 
 use crate::env;
 
+pub const AUTO_SETTING_FILENAME: &str = "settings.toml";
+pub const AUTO_SECRET_FILENAME: &str = ".secrets.toml";
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct HydroSettings {
     pub root_path: Option<PathBuf>,
@@ -18,8 +21,10 @@ impl Default for HydroSettings {
         let hydro_suffix = "_FOR_HYDRO";
         Self {
             root_path: env::get_var("ROOT_PATH", hydro_suffix),
-            settings_file: env::get_var("SETTINGS_FILE", hydro_suffix),
-            secrets_file: env::get_var("SECRETS_FILE", hydro_suffix),
+            settings_file: env::get_var("SETTINGS_FILE", hydro_suffix)
+                .or(Some(AUTO_SETTING_FILENAME.into())),
+            secrets_file: env::get_var("SECRETS_FILE", hydro_suffix)
+                .or(Some(AUTO_SECRET_FILENAME.into())),
             env: env::get_var_default(
                 "ENV",
                 hydro_suffix,
@@ -92,8 +97,8 @@ mod tests {
             HydroSettings::default(),
             HydroSettings {
                 root_path: None,
-                settings_file: None,
-                secrets_file: None,
+                settings_file: Some("settings.toml".into()),
+                secrets_file: Some(".secrets.toml".into()),
                 env: "development".into(),
                 envvar_prefix: "HYDRO".into(),
                 encoding: "utf-8".into(),
@@ -110,8 +115,8 @@ mod tests {
             HydroSettings::default(),
             HydroSettings {
                 root_path: Some("/an/absolute/path".into()),
-                settings_file: None,
-                secrets_file: None,
+                settings_file: Some("settings.toml".into()),
+                secrets_file: Some(".secrets.toml".into()),
                 env: "development".into(),
                 envvar_prefix: "HYDRO".into(),
                 encoding: "latin-1".into(),
@@ -129,8 +134,8 @@ mod tests {
                 .set_root_path(PathBuf::from("~/test/dir")),
             HydroSettings {
                 root_path: Some(PathBuf::from("~/test/dir")),
-                settings_file: None,
-                secrets_file: None,
+                settings_file: Some("settings.toml".into()),
+                secrets_file: Some(".secrets.toml".into()),
                 env: "development".into(),
                 envvar_prefix: "HYDRO".into(),
                 encoding: "utf-8".into(),

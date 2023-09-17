@@ -1,11 +1,7 @@
 use std::path::{Path, PathBuf, Component};
 
+use log::{debug, warn};
 use normpath::PathExt;
-
-#[cfg(not(feature = "tracing"))]
-use crate::tracing;
-#[cfg(feature = "tracing")]
-use tracing;
 
 const SETTINGS_FILE_EXTENSIONS: &[&str] = &[
     "toml",
@@ -53,14 +49,14 @@ impl FileSources {
         let filename = filename
             .and_then(|path| path.file_name())
             .or_else(|| {
-                tracing::warn!("Please pass pure file name, not path!");
+                warn!("Please pass pure file name, not path!");
                 None
             })
             .map(Path::new);
         let secret_filename = secret_filename
             .and_then(|path| path.file_name())
             .or_else(|| {
-                tracing::warn!("Please pass pure file name, not path!");
+                warn!("Please pass pure file name, not path!");
                 None
             })
             .map(Path::new);
@@ -77,10 +73,7 @@ impl FileSources {
                         Path::new(&format!("{stem}.local.{ext}")),
                     );
                 } else {
-                    tracing::warn!(
-                        "Unsupported settings file extension: {}",
-                        ext
-                    );
+                    warn!("Unsupported settings file extension: {}", ext);
                 };
             }
         }
@@ -90,10 +83,7 @@ impl FileSources {
                 if SETTINGS_FILE_EXTENSIONS.contains(&ext.as_ref()) {
                     sources.secrets = find_file(&candidates, filename);
                 } else {
-                    tracing::warn!(
-                        "Unsupported secrets file extension: {}",
-                        ext
-                    );
+                    warn!("Unsupported secrets file extension: {}", ext);
                 };
             }
         }
@@ -110,7 +100,7 @@ pub fn walk_to_root(path: &Path) -> Vec<PathBuf> {
     let normalized = path
         .normalize()
         .map_or_else(|_e| {
-            tracing::warn!("Failed to normalize path: {}", _e);
+            warn!("Failed to normalize path: {}", _e);
             let p: &Path = Component::RootDir.as_ref();
             p.to_path_buf()
         }, |p| p.into_path_buf());
@@ -132,7 +122,7 @@ fn find_file(level_dirs: &Vec<PathBuf>, filename: &Path) -> Option<PathBuf> {
             let dir = level_dir.join(settings_dir);
             let file_path = dir.join(filename);
             if file_path.is_file() {
-                tracing::debug!("Collect from {:?}", file_path);
+                debug!("Found file: {:?}", file_path);
                 return Some(file_path);
             }
         }

@@ -7,13 +7,10 @@ pub use config::{
 };
 use dotenv_parser::parse_dotenv;
 use serde::Deserialize;
-#[cfg(feature = "tracing")]
-use tracing;
+use log::debug;
 
 use crate::settings::HydroSettings;
 use crate::sources::FileSources;
-#[cfg(not(feature = "tracing"))]
-use crate::tracing;
 use crate::utils::path_to_string;
 
 type Table = HashMap<String, Value>;
@@ -148,7 +145,7 @@ impl Hydroconf {
         )
         .prefix_separator(PREFIX_SEPARATOR)
         .separator(self.hydro_settings.envvar_nested_sep.as_str());
-        tracing::debug!("Environment source: {:?}", env_source);
+        debug!("Environment source: {:?}", env_source);
         let builder = self.builder.clone().add_source(env_source);
         self.config = builder.build_cloned()?;
         self.builder = builder;

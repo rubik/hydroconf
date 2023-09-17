@@ -234,8 +234,6 @@ mod env;
 mod hydro;
 mod settings;
 mod sources;
-#[cfg(not(feature = "tracing"))]
-mod tracing;
 mod utils;
 
 pub use hydro::{Config, ConfigError, Environment, File, Hydroconf};

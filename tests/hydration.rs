@@ -1,11 +1,17 @@
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use hydroconf::{ConfigError, Hydroconf, HydroSettings};
 
 #[derive(Debug, PartialEq, Deserialize)]
 struct Config {
     pg: PostgresConfig,
+}
+
+#[derive(Debug, PartialEq, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+struct DBConfig {
+    redis_url: String,
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
@@ -235,5 +241,23 @@ fn test_local_settings() {
             port: 5555,
             password: "a strong password".into(),
         },
+    });
+}
+
+#[test]
+fn test_key_case_convertible() {
+    let config_dir = get_data_path("_custom_filename");
+    let s = HydroSettings {
+        root_path: Some(config_dir),
+        settings_file: Some(Path::new("base_settings.toml").into()),
+        secrets_file: Some(Path::new(".secrets.toml").into()),
+        env: "development".into(),
+        envvar_prefix: "HATTHOC".into(),
+        encoding: "utf-8".into(),
+        envvar_nested_sep: "__".into(),
+    };
+    let conf: Result<DBConfig, ConfigError> = Hydroconf::new(s).hydrate();
+    assert_eq!(conf.unwrap(), DBConfig {
+        redis_url: "redis:///".into(),
     });
 }

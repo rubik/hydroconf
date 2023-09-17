@@ -1,6 +1,7 @@
 [default]
 pg.port = 5432
 pg.host = 'localhost'
+REDIS_URL = 'redis:///'
 
 [production]
 pg.host = 'db-0'

@@ -58,21 +58,17 @@ impl Hydroconf {
     }
 
     pub fn discover_sources(&mut self) {
-        self.sources = self
-            .root_path()
-            .map(|p| {
-                let settings_filename =
-                    self.hydro_settings.settings_file.clone();
-                let secrets_filename =
-                    self.hydro_settings.secrets_file.clone();
-                FileSources::from_root(
-                    p,
-                    self.hydro_settings.env.as_str(),
-                    settings_filename.as_deref(),
-                    secrets_filename.as_deref(),
-                )
-            })
-            .unwrap_or_else(|| FileSources::default());
+        let HydroSettings {
+            root_path,
+            settings_file,
+            secrets_file,
+            env,
+            ..
+        } = &self.hydro_settings;
+        self.sources = match root_path {
+            Some(p) => FileSources::from_root(p, &env, settings_file.as_deref(), secrets_file.as_deref()),
+            None => FileSources::default(),
+        };
     }
 
     pub fn load_settings(&mut self) -> Result<&mut Self, ConfigError> {

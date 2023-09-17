@@ -1,4 +1,6 @@
-use std::path::{Path, PathBuf};
+use std::path::{Path, PathBuf, Component};
+
+use normpath::PathExt;
 
 #[cfg(not(feature = "tracing"))]
 use crate::tracing;
@@ -29,7 +31,7 @@ pub struct FileSources {
 
 impl FileSources {
     pub fn from_root(
-        root_path: PathBuf,
+        root_path: &Path,
         env_name: &str,
         filename: Option<&Path>,
         secret_filename: Option<&Path>,
@@ -104,15 +106,24 @@ impl FileSources {
     }
 }
 
-pub fn walk_to_root(mut path: PathBuf) -> Vec<PathBuf> {
-    let mut candidates = Vec::new();
-    if path.is_file() {
-        path = path.parent().unwrap_or_else(|| Path::new("/")).into();
-    }
-    for ancestor in path.ancestors() {
-        candidates.push(ancestor.to_path_buf());
-    }
-    candidates
+pub fn walk_to_root(path: &Path) -> Vec<PathBuf> {
+    let normalized = path
+        .normalize()
+        .map_or_else(|_e| {
+            tracing::warn!("Failed to normalize path: {}", _e);
+            let p: &Path = Component::RootDir.as_ref();
+            p.to_path_buf()
+        }, |p| p.into_path_buf());
+    let dir_path = if normalized.is_dir() {
+        path
+    } else {
+        normalized.parent().unwrap_or_else(|| Component::RootDir.as_ref())
+    };
+    dir_path
+        .ancestors()
+        .into_iter()
+        .map(|p| p.to_path_buf())
+        .collect()
 }
 
 fn find_file(level_dirs: &Vec<PathBuf>, filename: &Path) -> Option<PathBuf> {
@@ -153,7 +164,7 @@ mod test {
     #[test]
     fn test_walk_to_root_dir() {
         assert_eq!(
-            walk_to_root(PathBuf::from("/a/dir/located/somewhere")),
+            walk_to_root(Path::new("/a/dir/located/somewhere")),
             vec![
                 PathBuf::from("/a/dir/located/somewhere"),
                 PathBuf::from("/a/dir/located"),
@@ -166,7 +177,7 @@ mod test {
 
     #[test]
     fn test_walk_to_root_root() {
-        assert_eq!(walk_to_root(PathBuf::from("/")), vec![PathBuf::from("/")],);
+        assert_eq!(walk_to_root(Path::new("/")), vec![PathBuf::from("/")],);
     }
 
     #[test]
@@ -174,7 +185,7 @@ mod test {
         let data_path = get_data_path("");
         assert_eq!(
             FileSources::from_root(
-                data_path.clone(),
+                data_path.as_path(),
                 "development",
                 Some(Path::new("settings.toml")),
                 Some(Path::new(".secrets.toml"))
@@ -190,7 +201,7 @@ mod test {
         let data_path = get_data_path("2");
         assert_eq!(
             FileSources::from_root(
-                data_path.clone(),
+                data_path.as_path(),
                 "development",
                 Some(Path::new("settings.toml")),
                 Some(Path::new(".secrets.toml"))
@@ -209,7 +220,7 @@ mod test {
         let data_path = get_data_path("2");
         assert_eq!(
             FileSources::from_root(
-                data_path.clone(),
+                data_path.as_path(),
                 "production",
                 Some(Path::new("settings.toml")),
                 Some(Path::new(".secrets.toml"))
@@ -225,7 +236,7 @@ mod test {
         let data_path = get_data_path("3");
         assert_eq!(
             FileSources::from_root(
-                data_path.clone(),
+                data_path.as_path(),
                 "development",
                 Some(Path::new("settings.toml")),
                 Some(Path::new(".secrets.toml"))
@@ -241,7 +252,7 @@ mod test {
         let data_path = get_data_path("3");
         assert_eq!(
             FileSources::from_root(
-                data_path.clone(),
+                data_path.as_path(),
                 "production",
                 Some(Path::new("settings.toml")),
                 Some(Path::new(".secrets.toml"))
@@ -260,7 +271,7 @@ mod test {
         let data_path = get_data_path("4");
         assert_eq!(
             FileSources::from_root(
-                data_path.clone(),
+                data_path.as_path(),
                 "development",
                 Some(Path::new("settings.toml")),
                 Some(Path::new(".secrets.toml"))
@@ -275,10 +286,19 @@ mod test {
 
         let data_path = get_data_path("_custom_filename");
         assert_eq!(
-            FileSources::from_root(data_path.clone(), "development", Some(Path::new("base_settings.toml")), None),
+            FileSources::from_root(
+                data_path.as_path(),
+                "development",
+                Some(Path::new("base_settings.toml")),
+                None
+            ),
             FileSources {
-                settings: Some(data_path.clone().join("config/base_settings.toml")),
-                local_settings: Some(data_path.clone().join("base_settings.local.toml")),
+                settings: Some(
+                    data_path.clone().join("config/base_settings.toml")
+                ),
+                local_settings: Some(
+                    data_path.clone().join("base_settings.local.toml")
+                ),
                 secrets: None,
                 dotenv: vec![],
             },

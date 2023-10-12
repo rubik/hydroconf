@@ -326,6 +326,7 @@ fn test_local_settings() {
 #[test]
 fn test_key_case_convertible() {
     let config_dir = get_data_path("_custom_filename");
+    env::set_var("HATTHOC_REDIS_URL", "redis://?db=1");
     let s = HydroSettings {
         root_path: Some(config_dir),
         settings_file: Some(Path::new("base_settings.toml").into()),
@@ -339,7 +340,7 @@ fn test_key_case_convertible() {
     assert_eq!(
         conf.unwrap(),
         DBConfig {
-            redis_url: "redis:///".into(),
+            redis_url: "redis://?db=1".into(),
         }
     );
 }

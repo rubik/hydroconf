@@ -5,9 +5,10 @@ pub use config::{
     builder::DefaultState, Config, ConfigBuilder, ConfigError, Environment,
     File, Value,
 };
+use config::{Source, ValueKind};
 use dotenv_parser::parse_dotenv;
-use serde::Deserialize;
 use log::debug;
+use serde::Deserialize;
 
 use crate::settings::HydroSettings;
 use crate::sources::FileSources;
@@ -63,7 +64,12 @@ impl Hydroconf {
             ..
         } = &self.hydro_settings;
         self.sources = match root_path {
-            Some(p) => FileSources::from_root(p, &env, settings_file.as_deref(), secrets_file.as_deref()),
+            Some(p) => FileSources::from_root(
+                p,
+                env,
+                settings_file.as_deref(),
+                secrets_file.as_deref(),
+            ),
             None => FileSources::default(),
         };
     }
@@ -112,7 +118,7 @@ impl Hydroconf {
             let map =
                 parse_dotenv(&source).map_err(|e| ConfigError::FileParse {
                     uri: path_to_string(dotenv_path.clone()),
-                    cause: e.into(),
+                    cause: e,
                 })?;
 
             for (key, val) in map.iter() {
@@ -146,7 +152,24 @@ impl Hydroconf {
         .prefix_separator(PREFIX_SEPARATOR)
         .separator(self.hydro_settings.envvar_nested_sep.as_str());
         debug!("Environment source: {:?}", env_source);
-        let builder = self.builder.clone().add_source(env_source);
+        // When generate config from env var, ConfigBuilder automatically lowercase the keys,
+        // But our keys in settings files can be uppercase, and the keys from env vars don't override
+        // as we expects.
+        let sofar_config = self.builder.build_cloned()?.cache;
+        let keys = match sofar_config.kind {
+            ValueKind::Table(hm) => hm.into_keys().collect(),
+            _ => vec![],
+        };
+        let env_config = env_source.collect()?;
+        let mut builder = self.builder.clone();
+        // TODO: Handle nested keys
+        for (k, v) in env_config.into_iter() {
+            let upper_key = k.to_uppercase();
+            if keys.contains(&upper_key) {
+                builder = builder.set_override(upper_key, v)?;
+            }
+        }
+        builder = builder.add_source(env_source);
         self.config = builder.build_cloned()?;
         self.builder = builder;
 

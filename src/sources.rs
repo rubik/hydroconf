@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf, Component};
+use std::path::{Component, Path, PathBuf};
 
 use log::{debug, warn};
 use normpath::PathExt;
@@ -40,10 +40,14 @@ impl FileSources {
         };
         let candidates = walk_to_root(root_path);
 
-        find_file(&candidates, Path::new(".env"))
-            .map(|p| sources.dotenv.push(p));
-        find_file(&candidates, Path::new(&format!(".env.{env_name}")))
-            .map(|p| sources.dotenv.push(p));
+        if let Some(p) = find_file(&candidates, Path::new(".env")) {
+            sources.dotenv.push(p);
+        }
+        if let Some(p) =
+            find_file(&candidates, Path::new(&format!(".env.{env_name}")))
+        {
+            sources.dotenv.push(p);
+        }
 
         // Make sure the passed argument is a pure filename, not a path.
         let filename = filename
@@ -97,17 +101,20 @@ impl FileSources {
 }
 
 pub fn walk_to_root(path: &Path) -> Vec<PathBuf> {
-    let normalized = path
-        .normalize()
-        .map_or_else(|_e| {
+    let normalized = path.normalize().map_or_else(
+        |_e| {
             warn!("Failed to normalize path: {}", _e);
             let p: &Path = Component::RootDir.as_ref();
             p.to_path_buf()
-        }, |p| p.into_path_buf());
+        },
+        |p| p.into_path_buf(),
+    );
     let dir_path = if normalized.is_dir() {
         path
     } else {
-        normalized.parent().unwrap_or_else(|| Component::RootDir.as_ref())
+        normalized
+            .parent()
+            .unwrap_or_else(|| Component::RootDir.as_ref())
     };
     dir_path
         .ancestors()

@@ -181,7 +181,7 @@
 //! 12. `/`
 //!
 //! In each directory, Hydroconf will search for the files
-//! `settings.{toml,json,yaml,ini,hjson}` and
+//! `settings.{toml,json,yaml,ini,hjson}`, `settings.local.{toml,json,yaml,ini,hjson}` and
 //! `.secrets.{toml,json,yaml,ini,hjson}`. As soon as one of those (or both) are
 //! found, the search stops and Hydroconf won't search the remaining upper levels.
 //!
@@ -217,7 +217,13 @@
 //!    "production", etc.);
 //! 2. keep the secret values inside `config/.secrets.{toml,yaml,json,...}`
 //!    separated by environment and exclude this file from version control;
-//! 3. define the environment variable `ENV_FOR_DYNACONF` to specify which
+//! 3. while `settings.ext` is a base for project settings,
+//!    each team member may want to adjust a bit for his/her own local environment.
+//!    That overrides should be kept in `settings.local.{toml,yaml,json,...}`
+//!    and excluded from version control (Git). Note that this file will be loaded
+//!    before the `.secrets.ext` file, its values will be overwritten
+//!    by the secrets file.
+//! 3. define the environment variable `ENV_FOR_HYDRO` to specify which
 //!    environment should be loaded (besides the "default" one, which is always
 //!    loaded first);
 //! 4. if you want to override some values, or specify some secret values which

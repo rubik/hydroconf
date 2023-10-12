@@ -1,78 +1,140 @@
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
-const SETTINGS_FILE_EXTENSIONS: &[&str] =
-    &["toml", "json", "yaml", "ini", "hjson"];
+use log::{debug, warn};
+use normpath::PathExt;
+
+const SETTINGS_FILE_EXTENSIONS: &[&str] = &[
+    "toml",
+    #[cfg(feature = "json")]
+    "json",
+    #[cfg(feature = "yaml")]
+    "yaml",
+    #[cfg(feature = "ini")]
+    "ini",
+    #[cfg(feature = "json5")]
+    "hjson",
+];
 const SETTINGS_DIRS: &[&str] = &["", "config"];
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FileSources {
     pub settings: Option<PathBuf>,
+    // Local settings file is generally not tracked by version control.
+    pub(crate) local_settings: Option<PathBuf>,
     pub secrets: Option<PathBuf>,
     pub dotenv: Vec<PathBuf>,
 }
 
 impl FileSources {
-    pub fn from_root(root_path: PathBuf, env: &str) -> Self {
+    pub fn from_root(
+        root_path: &Path,
+        env_name: &str,
+        filename: Option<&Path>,
+        secret_filename: Option<&Path>,
+    ) -> Self {
         let mut sources = Self {
             settings: None,
+            local_settings: None,
             secrets: None,
             dotenv: Vec::new(),
         };
-        let mut settings_found = false;
         let candidates = walk_to_root(root_path);
 
-        for cand in candidates {
-            let dotenv_cand = cand.join(".env");
-            if dotenv_cand.exists() {
-                sources.dotenv.push(dotenv_cand);
-            }
-            let dotenv_cand = cand.join(format!(".env.{}", env));
-            if dotenv_cand.exists() {
-                sources.dotenv.push(dotenv_cand);
-            }
-            'outer: for &settings_dir in SETTINGS_DIRS {
-                let dir = cand.join(settings_dir);
-                for &ext in SETTINGS_FILE_EXTENSIONS {
-                    let settings_cand = dir.join(format!("settings.{}", ext));
-                    if settings_cand.exists() {
-                        sources.settings = Some(settings_cand);
-                        settings_found = true;
-                    }
-                    let secrets_cand = dir.join(format!(".secrets.{}", ext));
-                    if secrets_cand.exists() {
-                        sources.secrets = Some(secrets_cand);
-                        settings_found = true;
-                    }
-                    if settings_found {
-                        break 'outer;
-                    }
-                }
-            }
+        if let Some(p) = find_file(&candidates, Path::new(".env")) {
+            sources.dotenv.push(p);
+        }
+        if let Some(p) =
+            find_file(&candidates, Path::new(&format!(".env.{env_name}")))
+        {
+            sources.dotenv.push(p);
+        }
 
-            if sources.any() {
-                break;
+        // Make sure the passed argument is a pure filename, not a path.
+        let filename = filename
+            .and_then(|path| path.file_name())
+            .or_else(|| {
+                warn!("Please pass pure file name, not path!");
+                None
+            })
+            .map(Path::new);
+        let secret_filename = secret_filename
+            .and_then(|path| path.file_name())
+            .or_else(|| {
+                warn!("Please pass pure file name, not path!");
+                None
+            })
+            .map(Path::new);
+        if let Some(filename) = filename {
+            if let Some((ext, stem)) =
+                filename.extension().zip(filename.file_stem())
+            {
+                let ext = ext.to_string_lossy();
+                if SETTINGS_FILE_EXTENSIONS.contains(&ext.as_ref()) {
+                    sources.settings = find_file(&candidates, filename);
+                    let stem = stem.to_string_lossy();
+                    sources.local_settings = find_file(
+                        &candidates,
+                        Path::new(&format!("{stem}.local.{ext}")),
+                    );
+                } else {
+                    warn!("Unsupported settings file extension: {}", ext);
+                };
+            }
+        }
+        if let Some(filename) = secret_filename {
+            if let Some(ext) = filename.extension() {
+                let ext = ext.to_string_lossy();
+                if SETTINGS_FILE_EXTENSIONS.contains(&ext.as_ref()) {
+                    sources.secrets = find_file(&candidates, filename);
+                } else {
+                    warn!("Unsupported secrets file extension: {}", ext);
+                };
             }
         }
 
         sources
     }
 
-    fn any(&self) -> bool {
-        self.settings.is_some()
-            || self.secrets.is_some()
-            || !self.dotenv.is_empty()
+    pub fn local_settings(&self) -> Option<&Path> {
+        self.local_settings.as_deref()
     }
 }
 
-pub fn walk_to_root(mut path: PathBuf) -> Vec<PathBuf> {
-    let mut candidates = Vec::new();
-    if path.is_file() {
-        path = path.parent().unwrap_or_else(|| Path::new("/")).into();
+pub fn walk_to_root(path: &Path) -> Vec<PathBuf> {
+    let normalized = path.normalize().map_or_else(
+        |_e| {
+            warn!("Failed to normalize path: {}", _e);
+            let p: &Path = Component::RootDir.as_ref();
+            p.to_path_buf()
+        },
+        |p| p.into_path_buf(),
+    );
+    let dir_path = if normalized.is_dir() {
+        path
+    } else {
+        normalized
+            .parent()
+            .unwrap_or_else(|| Component::RootDir.as_ref())
+    };
+    dir_path
+        .ancestors()
+        .into_iter()
+        .map(|p| p.to_path_buf())
+        .collect()
+}
+
+fn find_file(level_dirs: &Vec<PathBuf>, filename: &Path) -> Option<PathBuf> {
+    for level_dir in level_dirs {
+        for &settings_dir in SETTINGS_DIRS {
+            let dir = level_dir.join(settings_dir);
+            let file_path = dir.join(filename);
+            if file_path.is_file() {
+                debug!("Found file: {:?}", file_path);
+                return Some(file_path);
+            }
+        }
     }
-    for ancestor in path.ancestors() {
-        candidates.push(ancestor.to_path_buf());
-    }
-    candidates
+    None
 }
 
 #[cfg(test)]
@@ -99,7 +161,7 @@ mod test {
     #[test]
     fn test_walk_to_root_dir() {
         assert_eq!(
-            walk_to_root(PathBuf::from("/a/dir/located/somewhere")),
+            walk_to_root(Path::new("/a/dir/located/somewhere")),
             vec![
                 PathBuf::from("/a/dir/located/somewhere"),
                 PathBuf::from("/a/dir/located"),
@@ -112,16 +174,22 @@ mod test {
 
     #[test]
     fn test_walk_to_root_root() {
-        assert_eq!(walk_to_root(PathBuf::from("/")), vec![PathBuf::from("/")],);
+        assert_eq!(walk_to_root(Path::new("/")), vec![PathBuf::from("/")],);
     }
 
     #[test]
     fn test_sources() {
         let data_path = get_data_path("");
         assert_eq!(
-            FileSources::from_root(data_path.clone(), "development"),
+            FileSources::from_root(
+                data_path.as_path(),
+                "development",
+                Some(Path::new("settings.toml")),
+                Some(Path::new(".secrets.toml"))
+            ),
             FileSources {
                 settings: Some(data_path.clone().join("config/settings.toml")),
+                local_settings: None,
                 secrets: Some(data_path.join("config/.secrets.toml")),
                 dotenv: vec![data_path.join(".env")],
             },
@@ -129,9 +197,15 @@ mod test {
 
         let data_path = get_data_path("2");
         assert_eq!(
-            FileSources::from_root(data_path.clone(), "development"),
+            FileSources::from_root(
+                data_path.as_path(),
+                "development",
+                Some(Path::new("settings.toml")),
+                Some(Path::new(".secrets.toml"))
+            ),
             FileSources {
                 settings: Some(data_path.clone().join("config/settings.toml")),
+                local_settings: None,
                 secrets: Some(data_path.join("config/.secrets.toml")),
                 dotenv: vec![
                     data_path.join(".env"),
@@ -142,9 +216,15 @@ mod test {
 
         let data_path = get_data_path("2");
         assert_eq!(
-            FileSources::from_root(data_path.clone(), "production"),
+            FileSources::from_root(
+                data_path.as_path(),
+                "production",
+                Some(Path::new("settings.toml")),
+                Some(Path::new(".secrets.toml"))
+            ),
             FileSources {
                 settings: Some(data_path.clone().join("config/settings.toml")),
+                local_settings: None,
                 secrets: Some(data_path.join("config/.secrets.toml")),
                 dotenv: vec![data_path.join(".env")],
             },
@@ -152,9 +232,15 @@ mod test {
 
         let data_path = get_data_path("3");
         assert_eq!(
-            FileSources::from_root(data_path.clone(), "development"),
+            FileSources::from_root(
+                data_path.as_path(),
+                "development",
+                Some(Path::new("settings.toml")),
+                Some(Path::new(".secrets.toml"))
+            ),
             FileSources {
                 settings: Some(data_path.clone().join("settings.toml")),
+                local_settings: None,
                 secrets: Some(data_path.join(".secrets.toml")),
                 dotenv: vec![data_path.join(".env")],
             },
@@ -162,14 +248,56 @@ mod test {
 
         let data_path = get_data_path("3");
         assert_eq!(
-            FileSources::from_root(data_path.clone(), "production"),
+            FileSources::from_root(
+                data_path.as_path(),
+                "production",
+                Some(Path::new("settings.toml")),
+                Some(Path::new(".secrets.toml"))
+            ),
             FileSources {
                 settings: Some(data_path.clone().join("settings.toml")),
+                local_settings: None,
                 secrets: Some(data_path.join(".secrets.toml")),
                 dotenv: vec![
                     data_path.join(".env"),
                     data_path.join(".env.production")
                 ],
+            },
+        );
+
+        let data_path = get_data_path("4");
+        assert_eq!(
+            FileSources::from_root(
+                data_path.as_path(),
+                "development",
+                Some(Path::new("settings.toml")),
+                Some(Path::new(".secrets.toml"))
+            ),
+            FileSources {
+                settings: Some(data_path.clone().join("settings.toml")),
+                local_settings: Some(data_path.join("settings.local.toml")),
+                secrets: Some(data_path.join(".secrets.toml")),
+                dotenv: vec![],
+            },
+        );
+
+        let data_path = get_data_path("_custom_filename");
+        assert_eq!(
+            FileSources::from_root(
+                data_path.as_path(),
+                "development",
+                Some(Path::new("base_settings.toml")),
+                None
+            ),
+            FileSources {
+                settings: Some(
+                    data_path.clone().join("config/base_settings.toml")
+                ),
+                local_settings: Some(
+                    data_path.clone().join("base_settings.local.toml")
+                ),
+                secrets: None,
+                dotenv: vec![],
             },
         );
     }

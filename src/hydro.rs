@@ -1,8 +1,13 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-pub use config::{Config, ConfigError, Environment, File, Value};
+pub use config::{
+    builder::DefaultState, Config, ConfigBuilder, ConfigError, Environment,
+    File, Value,
+};
+use config::{Source, ValueKind};
 use dotenv_parser::parse_dotenv;
+use log::debug;
 use serde::Deserialize;
 
 use crate::settings::HydroSettings;
@@ -10,10 +15,13 @@ use crate::sources::FileSources;
 use crate::utils::path_to_string;
 
 type Table = HashMap<String, Value>;
+const PREFIX_SEPARATOR: &str = "_";
 
 #[derive(Debug, Clone)]
 pub struct Hydroconf {
     config: Config,
+    // This builder is for per-environment config (the "config" field above)
+    builder: ConfigBuilder<DefaultState>,
     orig_config: Config,
     hydro_settings: HydroSettings,
     sources: FileSources,
@@ -29,6 +37,7 @@ impl Hydroconf {
     pub fn new(hydro_settings: HydroSettings) -> Self {
         Self {
             config: Config::default(),
+            builder: Config::builder(),
             orig_config: Config::default(),
             hydro_settings,
             sources: FileSources::default(),
@@ -43,43 +52,63 @@ impl Hydroconf {
         self.merge_settings()?;
         self.override_from_dotenv()?;
         self.override_from_env()?;
-        self.try_into()
+        self.try_deserialize()
     }
 
     pub fn discover_sources(&mut self) {
-        self.sources = self
-            .root_path()
-            .map(|p| {
-                FileSources::from_root(p, self.hydro_settings.env.as_str())
-            })
-            .unwrap_or_else(|| FileSources::default());
+        let HydroSettings {
+            root_path,
+            settings_file,
+            secrets_file,
+            env,
+            ..
+        } = &self.hydro_settings;
+        self.sources = match root_path {
+            Some(p) => FileSources::from_root(
+                p,
+                env,
+                settings_file.as_deref(),
+                secrets_file.as_deref(),
+            ),
+            None => FileSources::default(),
+        };
     }
 
     pub fn load_settings(&mut self) -> Result<&mut Self, ConfigError> {
+        let mut builder = Config::builder();
         if let Some(ref settings_path) = self.sources.settings {
-            self.orig_config.merge(File::from(settings_path.clone()))?;
+            builder = builder.add_source(File::from(settings_path.clone()));
+        }
+        if let Some(ref local_settings_path) = self.sources.local_settings {
+            builder =
+                builder.add_source(File::from(local_settings_path.clone()));
         }
         if let Some(ref secrets_path) = self.sources.secrets {
-            self.orig_config.merge(File::from(secrets_path.clone()))?;
+            builder = builder.add_source(File::from(secrets_path.clone()));
         }
+        self.orig_config = builder.build()?;
 
         Ok(self)
     }
 
     pub fn merge_settings(&mut self) -> Result<&mut Self, ConfigError> {
+        let mut builder = self.builder.clone();
         for &name in &["default", self.hydro_settings.env.as_str()] {
             let table_value: Option<Table> = self.orig_config.get(name).ok();
             if let Some(value) = table_value {
                 let mut new_config = Config::default();
                 new_config.cache = value.into();
-                self.config.merge(new_config)?;
+                builder = builder.add_source(new_config);
             }
         }
+        self.config = builder.build_cloned()?;
+        self.builder = builder;
 
         Ok(self)
     }
 
     pub fn override_from_dotenv(&mut self) -> Result<&mut Self, ConfigError> {
+        let mut builder = self.builder.clone();
         for dotenv_path in &self.sources.dotenv {
             let source = std::fs::read_to_string(dotenv_path.clone())
                 .map_err(|e| ConfigError::FileParse {
@@ -89,15 +118,15 @@ impl Hydroconf {
             let map =
                 parse_dotenv(&source).map_err(|e| ConfigError::FileParse {
                     uri: path_to_string(dotenv_path.clone()),
-                    cause: e.into(),
+                    cause: e,
                 })?;
 
             for (key, val) in map.iter() {
                 if val.is_empty() {
                     continue;
                 }
-                let prefix =
-                    self.hydro_settings.envvar_prefix.to_lowercase() + "_";
+                let prefix = self.hydro_settings.envvar_prefix.to_lowercase()
+                    + PREFIX_SEPARATOR;
                 let mut key = key.to_lowercase();
                 if !key.starts_with(&prefix) {
                     continue;
@@ -106,20 +135,43 @@ impl Hydroconf {
                 }
                 let sep = self.hydro_settings.envvar_nested_sep.clone();
                 key = key.replace(&sep, ".");
-                self.config.set::<String>(&key, val.into())?;
+                builder =
+                    builder.set_override::<String, String>(key, val.into())?;
             }
         }
+        self.config = builder.build_cloned()?;
+        self.builder = builder;
 
         Ok(self)
     }
 
     pub fn override_from_env(&mut self) -> Result<&mut Self, ConfigError> {
-        self.config.merge(
-            Environment::with_prefix(
-                self.hydro_settings.envvar_prefix.as_str(),
-            )
-            .separator(self.hydro_settings.envvar_nested_sep.as_str()),
-        )?;
+        let env_source = Environment::with_prefix(
+            self.hydro_settings.envvar_prefix.as_str(),
+        )
+        .prefix_separator(PREFIX_SEPARATOR)
+        .separator(self.hydro_settings.envvar_nested_sep.as_str());
+        debug!("Environment source: {:?}", env_source);
+        // When generate config from env var, ConfigBuilder automatically lowercase the keys,
+        // But our keys in settings files can be uppercase, and the keys from env vars don't override
+        // as we expects.
+        let sofar_config = self.builder.build_cloned()?.cache;
+        let keys = match sofar_config.kind {
+            ValueKind::Table(hm) => hm.into_keys().collect(),
+            _ => vec![],
+        };
+        let env_config = env_source.collect()?;
+        let mut builder = self.builder.clone();
+        // TODO: Handle nested keys
+        for (k, v) in env_config.into_iter() {
+            let upper_key = k.to_uppercase();
+            if keys.contains(&upper_key) {
+                builder = builder.set_override(upper_key, v)?;
+            }
+        }
+        builder = builder.add_source(env_source);
+        self.config = builder.build_cloned()?;
+        self.builder = builder;
 
         Ok(self)
     }
@@ -131,8 +183,10 @@ impl Hydroconf {
             .or_else(|| std::env::current_exe().ok())
     }
 
-    pub fn try_into<'de, T: Deserialize<'de>>(self) -> Result<T, ConfigError> {
-        self.config.try_into()
+    pub fn try_deserialize<'de, T: Deserialize<'de>>(
+        self,
+    ) -> Result<T, ConfigError> {
+        self.config.try_deserialize()
     }
 
     //pub fn refresh(&mut self) -> Result<&mut Self, ConfigError> {
@@ -151,7 +205,9 @@ impl Hydroconf {
     where
         T: Into<Value>,
     {
-        self.config.set_default(key, value)?;
+        let builder = self.builder.clone().set_default(key, value)?;
+        self.config = builder.build_cloned()?;
+        self.builder = builder;
         Ok(self)
     }
 
@@ -163,7 +219,9 @@ impl Hydroconf {
     where
         T: Into<Value>,
     {
-        self.config.set(key, value)?;
+        let builder = self.builder.clone().set_override(key, value)?;
+        self.config = builder.build_cloned()?;
+        self.builder = builder;
         Ok(self)
     }
 
@@ -175,7 +233,7 @@ impl Hydroconf {
     }
 
     pub fn get_str(&self, key: &str) -> Result<String, ConfigError> {
-        self.get(key).and_then(Value::into_str)
+        self.get(key).and_then(Value::into_string)
     }
 
     pub fn get_int(&self, key: &str) -> Result<i64, ConfigError> {

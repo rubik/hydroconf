@@ -10,9 +10,17 @@ homepage = "https://github.com/rubik/hydroconf"
 repository = "https://github.com/rubik/hydroconf"
 keywords = ["configuration", "12factorapp", "settings"]
 
+[features]
+json = ["config/json"]
+yaml = ["config/yaml"]
+ini = ["config/ini"]
+json5 = ["config/json5"]
+
 [dependencies]
-config = "0.10.1"
+config = {version = ">=0.13.3, <0.14", default-features = false, features = ["toml"]}
 dotenv-parser = ">=0.1.2"
+log = "0.4.20"
+normpath = "1.1.1"
 serde = "1.0"
 
 [dev-dependencies]
